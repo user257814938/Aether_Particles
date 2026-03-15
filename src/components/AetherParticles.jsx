@@ -7,13 +7,21 @@ import styles from "./AetherParticles.module.css";
 
 const { Hands } = handsPackage;
 
+// Central preset registry:
+// - `color` defines the auto-selected default tint for each model
+// - `icon` supports faster visual recognition in the sidebar
+// - `rotation` decides whether the shape can tilt vertically or should stay front-facing
 const PRESETS = {
-  sphere: { label: "Sphere", color: "#3b82f6", icon: "\u25CF" },
-  heart: { label: "Heart", color: "#ec4899", icon: "\u2665" },
-  saturn: { label: "Saturn", color: "#fbbf24", icon: "\u{1FA90}" },
-  buddha: { label: "Buddha", color: "#f97316", icon: "\u2638" },
-  flower: { label: "Flower", color: "#22c55e", icon: "\u273F" },
-  fireworks: { label: "Fireworks", color: "#ef4444", icon: "\u2726" },
+  sphere: { label: "Sphere", color: "#2563eb", icon: "\u25CF", rotation: "full" },
+  heart: { label: "Heart", color: "#dc2626", icon: "\u2665", rotation: "horizontal" },
+  saturn: { label: "Saturn", color: "#caa46b", icon: "\u{1FA90}", rotation: "horizontal" },
+  buddha: { label: "Buddha", color: "#b7791f", icon: "\u2638", rotation: "horizontal" },
+  flower: { label: "Flower", color: "#e11d48", icon: "\u273F", rotation: "horizontal" },
+  lotus: { label: "Lotus", color: "#ec4899", icon: "\u{1FAB7}", rotation: "horizontal" },
+  fireworks: { label: "Fireworks", color: "#f97316", icon: "\u2726", rotation: "full" },
+  supernova: { label: "Supernova", color: "#8b5cf6", icon: "\u273A", rotation: "full" },
+  cube: { label: "Cube", color: "#14b8a6", icon: "\u25A3", rotation: "full" },
+  square: { label: "Square", color: "#d97706", icon: "\u25A0", rotation: "horizontal" },
 };
 
 const DEFAULT_STATUS = {
@@ -42,7 +50,18 @@ export default function AetherParticles() {
   const [particleColor, setParticleColor] = useState(PRESETS.sphere.color);
   const [status, setStatus] = useState(DEFAULT_STATUS);
   const [forceLevel, setForceLevel] = useState(0);
+  // The onboarding guide opens by default, then becomes user-controlled via the left panel.
   const [isGuideOpen, setIsGuideOpen] = useState(true);
+
+  // Sidebar layout mirrors the viewing rules:
+  // left column = fully rotatable 3D forms, right column = front-facing readable silhouettes.
+  const fullPresets = Object.entries(PRESETS)
+    .filter(([, value]) => value.rotation === "full")
+    .sort((left, right) => left[1].label.localeCompare(right[1].label));
+
+  const horizontalPresets = Object.entries(PRESETS)
+    .filter(([, value]) => value.rotation === "horizontal")
+    .sort((left, right) => left[1].label.localeCompare(right[1].label));
 
   useEffect(() => {
     activePresetRef.current = preset;
@@ -166,6 +185,7 @@ export default function AetherParticles() {
         });
 
         const averageTension = totalTension / handLandmarks.length;
+        // Gesture openness powers both the particle expansion and the force gauge in the dock.
         const opennessForce = THREE.MathUtils.clamp(
           THREE.MathUtils.mapLinear(averageTension, 0.1, 0.5, 0, 1),
           0,
@@ -241,8 +261,16 @@ export default function AetherParticles() {
       }
 
       positionAttribute.needsUpdate = true;
+      // Silhouettes stay readable from the front, while volumetric objects can spin on both axes.
+      const rotationMode = PRESETS[activePresetRef.current].rotation;
       particles.rotation.y += 0.002;
-      particles.rotation.x += 0.001;
+
+      if (rotationMode === "full") {
+        particles.rotation.x += 0.001;
+      } else {
+        particles.rotation.x += (0 - particles.rotation.x) * 0.08;
+      }
+
       renderer.render(scene, camera);
     };
 
@@ -361,21 +389,46 @@ export default function AetherParticles() {
 
         <div className={styles.block}>
           <span className={styles.label}>Shape Template</span>
-          <div className={styles.grid}>
-            {Object.entries(PRESETS).map(([key, value]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => handlePresetChange(key)}
-                className={styles.presetButton}
-                data-active={preset === key}
-              >
-                <span className={styles.presetIcon} aria-hidden="true">
-                  {value.icon}
-                </span>
-                <span className={styles.presetLabel}>{value.label}</span>
-              </button>
-            ))}
+          <div className={styles.presetColumns}>
+            <div className={styles.presetColumn}>
+              <span className={styles.presetColumnLabel}>Full</span>
+              <div className={styles.presetList}>
+                {fullPresets.map(([key, value]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => handlePresetChange(key)}
+                    className={styles.presetButton}
+                    data-active={preset === key}
+                  >
+                    <span className={styles.presetIcon} aria-hidden="true">
+                      {value.icon}
+                    </span>
+                    <span className={styles.presetLabel}>{value.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className={styles.presetColumn}>
+              <span className={styles.presetColumnLabel}>Horizontal</span>
+              <div className={styles.presetList}>
+                {horizontalPresets.map(([key, value]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => handlePresetChange(key)}
+                    className={styles.presetButton}
+                    data-active={preset === key}
+                  >
+                    <span className={styles.presetIcon} aria-hidden="true">
+                      {value.icon}
+                    </span>
+                    <span className={styles.presetLabel}>{value.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -402,6 +455,7 @@ export default function AetherParticles() {
         </div>
       </section>
 
+      {/* Bottom-left utility dock: live force feedback + camera placement preview. */}
       <div className={styles.bottomDock}>
         <section className={styles.forceCard}>
           <div className={styles.forceHeader}>
@@ -433,6 +487,7 @@ export default function AetherParticles() {
 
       <video ref={hiddenVideoRef} className={styles.hiddenVideo} playsInline muted />
 
+      {/* Welcome guide shown on first load and reopened later through the "Aide ?" button. */}
       <div
         className={`${styles.guideOverlay} ${
           isGuideOpen ? styles.guideOverlayVisible : styles.guideOverlayHidden
@@ -502,90 +557,304 @@ export default function AetherParticles() {
 }
 
 function buildPresetPositions(type, particleCount) {
+  switch (type) {
+    case "heart":
+      return createHeartPositions(particleCount);
+    case "saturn":
+      return createSaturnPositions(particleCount);
+    case "buddha":
+      return createBuddhaPositions(particleCount);
+    case "flower":
+      return createFlowerPositions(particleCount);
+    case "lotus":
+      return createLotusPositions(particleCount);
+    case "fireworks":
+      return createFireworksPositions(particleCount);
+    case "supernova":
+      return createSupernovaPositions(particleCount);
+    case "cube":
+      return createCubePositions(particleCount);
+    case "square":
+      return createSquarePositions(particleCount);
+    case "sphere":
+    default:
+      return createSpherePositions(particleCount);
+  }
+}
+
+function createSpherePositions(particleCount) {
   const targetPositions = new Float32Array(particleCount * 3);
 
   for (let index = 0; index < particleCount; index += 1) {
     const offset = index * 3;
-    let x = 0;
-    let y = 0;
-    let z = 0;
+    const u = Math.random();
+    const v = Math.random();
+    const theta = 2 * Math.PI * u;
+    const phi = Math.acos(2 * v - 1);
 
-    switch (type) {
-      case "sphere": {
-        const u = Math.random();
-        const v = Math.random();
-        const theta = 2 * Math.PI * u;
-        const phi = Math.acos(2 * v - 1);
-        x = 5 * Math.sin(phi) * Math.cos(theta);
-        y = 5 * Math.sin(phi) * Math.sin(theta);
-        z = 5 * Math.cos(phi);
-        break;
-      }
-      case "heart": {
-        const t = Math.random() * 2 * Math.PI;
-        const scale = 0.3;
-        x = 16 * Math.sin(t) ** 3 * scale;
-        y =
-          (13 * Math.cos(t) -
-            5 * Math.cos(2 * t) -
-            2 * Math.cos(3 * t) -
-            Math.cos(4 * t)) *
-          scale;
-        z = (Math.random() - 0.5) * 2;
-        break;
-      }
-      case "saturn": {
-        if (index < particleCount * 0.4) {
-          const u = Math.random();
-          const v = Math.random();
-          const theta = 2 * Math.PI * u;
-          const phi = Math.acos(2 * v - 1);
-          x = 3.5 * Math.sin(phi) * Math.cos(theta);
-          y = 3.5 * Math.sin(phi) * Math.sin(theta);
-          z = 3.5 * Math.cos(phi);
-        } else {
-          const distance = 5 + Math.random() * 3;
-          const angle = Math.random() * Math.PI * 2;
-          x = Math.cos(angle) * distance;
-          z = Math.sin(angle) * distance;
-          y = (Math.random() - 0.5) * 0.4;
-        }
-        break;
-      }
-      case "buddha": {
-        const angle = Math.random() * Math.PI * 2;
-        const height = (Math.random() - 0.5) * 8;
-        const radius = height < -2 ? 4 : height < 1 ? 2.5 : height < 3 ? 1.5 : 1;
-        x = Math.cos(angle) * radius * Math.random();
-        y = height;
-        z = Math.sin(angle) * radius * Math.random();
-        break;
-      }
-      case "flower": {
-        const angle = Math.random() * Math.PI * 2;
-        const petals = 5;
-        const radius = 5 * Math.cos(petals * angle);
-        x = Math.cos(angle) * radius * Math.random();
-        y = Math.sin(angle) * radius * Math.random();
-        z = (Math.random() - 0.5) * 2;
-        break;
-      }
-      case "fireworks": {
-        const angle = Math.random() * Math.PI * 2;
-        const distance = Math.random() * 8;
-        x = Math.cos(angle) * distance;
-        y = Math.sin(angle) * distance;
-        z = (Math.random() - 0.5) * distance;
-        break;
-      }
-      default:
-        break;
-    }
-
-    targetPositions[offset] = x;
-    targetPositions[offset + 1] = y;
-    targetPositions[offset + 2] = z;
+    targetPositions[offset] = 5 * Math.sin(phi) * Math.cos(theta);
+    targetPositions[offset + 1] = 5 * Math.sin(phi) * Math.sin(theta);
+    targetPositions[offset + 2] = 5 * Math.cos(phi);
   }
 
   return targetPositions;
+}
+
+function createHeartPositions(particleCount) {
+  const targetPositions = new Float32Array(particleCount * 3);
+
+  for (let index = 0; index < particleCount; index += 1) {
+    const offset = index * 3;
+    const t = Math.random() * 2 * Math.PI;
+    const scale = 0.3;
+
+    targetPositions[offset] = 16 * Math.sin(t) ** 3 * scale;
+    targetPositions[offset + 1] =
+      (13 * Math.cos(t) -
+        5 * Math.cos(2 * t) -
+        2 * Math.cos(3 * t) -
+        Math.cos(4 * t)) *
+      scale;
+    targetPositions[offset + 2] = (Math.random() - 0.5) * 2;
+  }
+
+  return targetPositions;
+}
+
+function createSaturnPositions(particleCount) {
+  const targetPositions = new Float32Array(particleCount * 3);
+
+  for (let index = 0; index < particleCount; index += 1) {
+    const offset = index * 3;
+
+    if (index < particleCount * 0.4) {
+      const u = Math.random();
+      const v = Math.random();
+      const theta = 2 * Math.PI * u;
+      const phi = Math.acos(2 * v - 1);
+
+      targetPositions[offset] = 3.5 * Math.sin(phi) * Math.cos(theta);
+      targetPositions[offset + 1] = 3.5 * Math.sin(phi) * Math.sin(theta);
+      targetPositions[offset + 2] = 3.5 * Math.cos(phi);
+      continue;
+    }
+
+    const distance = 5 + Math.random() * 3;
+    const angle = Math.random() * Math.PI * 2;
+    targetPositions[offset] = Math.cos(angle) * distance;
+    targetPositions[offset + 1] = (Math.random() - 0.5) * 0.4;
+    targetPositions[offset + 2] = Math.sin(angle) * distance;
+  }
+
+  return targetPositions;
+}
+
+// Front-facing polar flower based on a rose curve for a clean face-on silhouette.
+function createFlowerPositions(particleCount) {
+  const targetPositions = new Float32Array(particleCount * 3);
+
+  for (let index = 0; index < particleCount; index += 1) {
+    const offset = index * 3;
+    const phi = Math.random() * Math.PI * 2;
+    const radius = 2 * Math.cos(5 * phi) + 1;
+
+    targetPositions[offset] = radius * Math.cos(phi) * 2.1;
+    targetPositions[offset + 1] = radius * Math.sin(phi) * 2.1;
+    targetPositions[offset + 2] = (Math.random() - 0.5) * 2;
+  }
+
+  return targetPositions;
+}
+
+// Lotus uses layered petals plus a bowl-like vertical curve to keep the flower readable from the front.
+function createLotusPositions(particleCount) {
+  const targetPositions = new Float32Array(particleCount * 3);
+
+  for (let index = 0; index < particleCount; index += 1) {
+    const offset = index * 3;
+    const theta = Math.random() * Math.PI * 2;
+    const radiusProgress = Math.random();
+    const radius = Math.cos(4 * theta) * radiusProgress * 2.5;
+    const x = radius * Math.cos(theta);
+    const z = radius * Math.sin(theta);
+    const y = radiusProgress * radiusProgress * 1.5 - Math.abs(radius) * 0.3 - 0.5;
+    const [volumeX, volumeY, volumeZ] = addVolume(x, y, z, 0.05);
+
+    targetPositions[offset] = volumeX * 2.2;
+    targetPositions[offset + 1] = volumeY * 2.2;
+    targetPositions[offset + 2] = volumeZ * 2.2;
+  }
+
+  return targetPositions;
+}
+
+// Buddha is sampled from a 2D silhouette mask, then extruded slightly in depth to preserve the figure.
+function createBuddhaPositions(particleCount) {
+  return sampleMaskShape(
+    particleCount,
+    [-1.25, 1.25],
+    [-1.32, 1.36],
+    (x, y) => buddhaMask(x, y),
+    (x, y) => {
+      const centered = 1 - Math.min(1, Math.abs(x) * 0.8 + Math.abs(y) * 0.18);
+      return (Math.random() - 0.5) * 0.16 + centered * 0.26;
+    },
+  );
+}
+
+function createFireworksPositions(particleCount) {
+  const targetPositions = new Float32Array(particleCount * 3);
+
+  for (let index = 0; index < particleCount; index += 1) {
+    const offset = index * 3;
+    const angle = Math.random() * Math.PI * 2;
+    const distance = Math.random() * 8;
+
+    targetPositions[offset] = Math.cos(angle) * distance;
+    targetPositions[offset + 1] = Math.sin(angle) * distance;
+    targetPositions[offset + 2] = (Math.random() - 0.5) * distance;
+  }
+
+  return targetPositions;
+}
+
+function createSupernovaPositions(particleCount) {
+  const targetPositions = new Float32Array(particleCount * 3);
+
+  for (let index = 0; index < particleCount; index += 1) {
+    const offset = index * 3;
+    const radius = Math.random() * 3;
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.random() * Math.PI;
+
+    targetPositions[offset] = radius * Math.sin(phi) * Math.cos(theta) * 2;
+    targetPositions[offset + 1] = radius * Math.sin(phi) * Math.sin(theta) * 2;
+    targetPositions[offset + 2] = radius * Math.cos(phi) * 2;
+  }
+
+  return targetPositions;
+}
+
+function createCubePositions(particleCount) {
+  const targetPositions = new Float32Array(particleCount * 3);
+  const halfSize = 4.2;
+
+  for (let index = 0; index < particleCount; index += 1) {
+    const offset = index * 3;
+    const face = Math.floor(Math.random() * 6);
+    const sign = face % 2 === 0 ? -halfSize : halfSize;
+    const u = (Math.random() - 0.5) * halfSize * 2;
+    const v = (Math.random() - 0.5) * halfSize * 2;
+
+    if (face < 2) {
+      targetPositions[offset] = sign;
+      targetPositions[offset + 1] = u;
+      targetPositions[offset + 2] = v;
+    } else if (face < 4) {
+      targetPositions[offset] = u;
+      targetPositions[offset + 1] = sign;
+      targetPositions[offset + 2] = v;
+    } else {
+      targetPositions[offset] = u;
+      targetPositions[offset + 1] = v;
+      targetPositions[offset + 2] = sign;
+    }
+  }
+
+  return targetPositions;
+}
+
+// Square is intentionally tighter than the previous version so it reads as less zoomed-out on screen.
+function createSquarePositions(particleCount) {
+  const targetPositions = new Float32Array(particleCount * 3);
+  const halfSize = 3.8;
+
+  for (let index = 0; index < particleCount; index += 1) {
+    const offset = index * 3;
+    const edge = index % 4;
+    const t = (Math.random() - 0.5) * halfSize * 2;
+    const depth = (Math.random() - 0.5) * 0.35;
+
+    if (edge === 0) {
+      targetPositions[offset] = -halfSize;
+      targetPositions[offset + 1] = t;
+    } else if (edge === 1) {
+      targetPositions[offset] = halfSize;
+      targetPositions[offset + 1] = t;
+    } else if (edge === 2) {
+      targetPositions[offset] = t;
+      targetPositions[offset + 1] = -halfSize;
+    } else {
+      targetPositions[offset] = t;
+      targetPositions[offset + 1] = halfSize;
+    }
+
+    targetPositions[offset + 2] = depth;
+  }
+
+  return targetPositions;
+}
+
+function sampleMaskShape(particleCount, xRange, yRange, maskFn, zFn) {
+  const targetPositions = new Float32Array(particleCount * 3);
+  let accepted = 0;
+  let attempts = 0;
+
+  while (accepted < particleCount && attempts < particleCount * 40) {
+    attempts += 1;
+    const x = lerp(xRange[0], xRange[1], Math.random());
+    const y = lerp(yRange[0], yRange[1], Math.random());
+
+    if (!maskFn(x, y)) {
+      continue;
+    }
+
+    const offset = accepted * 3;
+    targetPositions[offset] = x * 4.3;
+    targetPositions[offset + 1] = y * 4.3;
+    targetPositions[offset + 2] = zFn(x, y) * 4.3;
+    accepted += 1;
+  }
+
+  while (accepted < particleCount) {
+    const offset = accepted * 3;
+    targetPositions[offset] = 0;
+    targetPositions[offset + 1] = 0;
+    targetPositions[offset + 2] = 0;
+    accepted += 1;
+  }
+
+  return targetPositions;
+}
+
+function buddhaMask(x, y) {
+  const inCircle = (cx, cy, radius) => (x - cx) ** 2 + (y - cy) ** 2 <= radius ** 2;
+  const inEllipse = (cx, cy, rx, ry) =>
+    ((x - cx) ** 2) / (rx ** 2) + ((y - cy) ** 2) / (ry ** 2) <= 1;
+
+  const head = inCircle(0, 0.86, 0.24) || inCircle(0, 1.12, 0.12);
+  const shoulders = inEllipse(0, 0.44, 0.62, 0.32);
+  const torso = inEllipse(0, 0.04, 0.42, 0.52);
+  const arms = inEllipse(-0.46, 0.05, 0.16, 0.28) || inEllipse(0.46, 0.05, 0.16, 0.28);
+  const lap = inEllipse(0, -0.54, 0.9, 0.36);
+  const lotus =
+    inEllipse(-0.42, -0.88, 0.34, 0.16) ||
+    inEllipse(0, -0.92, 0.44, 0.18) ||
+    inEllipse(0.42, -0.88, 0.34, 0.16);
+  const innerGap =
+    inEllipse(0, 0.2, 0.15, 0.26) && y < 0.46 && y > -0.08 && Math.abs(x) < 0.22;
+
+  return (head || shoulders || torso || arms || lap || lotus) && !innerGap;
+}
+
+function addVolume(x, y, z, amount) {
+  return [
+    x + (Math.random() - 0.5) * amount,
+    y + (Math.random() - 0.5) * amount,
+    z + (Math.random() - 0.5) * amount,
+  ];
+}
+
+function lerp(start, end, progress) {
+  return start + (end - start) * progress;
 }

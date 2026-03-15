@@ -106,9 +106,29 @@
   color: rgba(255, 255, 255, 0.46);
 }
 
-.grid {
+/* Preset chooser now splits full-rotation shapes and front-facing shapes into two sorted columns. */
+.presetColumns {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.presetColumn {
+  display: grid;
+  gap: 8px;
+}
+
+.presetColumnLabel {
+  padding-left: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.presetList {
+  display: grid;
   gap: 10px;
 }
 
@@ -296,6 +316,7 @@
   background: rgba(255, 255, 255, 0.04);
 }
 
+/* First-run onboarding overlay that can be reopened from the left panel help button. */
 .guideOverlay {
   position: fixed;
   inset: 0;
