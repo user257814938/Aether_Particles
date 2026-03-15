@@ -236,7 +236,7 @@
 .colorControl {
   position: relative;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr;
   align-items: center;
   gap: 12px;
   min-height: 0;
@@ -256,41 +256,27 @@
 }
 
 .colorMeta {
-  display: grid;
-  gap: 6px;
+  display: flex;
+  align-items: center;
   min-width: 0;
-  align-content: center;
-}
-
-.colorName {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.58);
 }
 
 .colorValue {
   margin: 0;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.06em;
   color: #ffffff;
-}
-
-.colorArrow {
-  margin-left: auto;
-  font-size: 22px;
   line-height: 1;
-  color: rgba(255, 255, 255, 0.54);
+  transform: translateY(-1px);
 }
 
 .colorInput {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 1px;
-  height: 1px;
+  width: 44px;
+  height: 44px;
   border: 0;
   background: transparent;
   cursor: pointer;

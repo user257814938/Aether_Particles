@@ -569,7 +569,7 @@ export default function AetherParticles() {
 
           <div className={styles.block}>
             <label htmlFor="particle-color" className={styles.label}>
-              Color
+              Custom Color
             </label>
             <div className={styles.colorCard}>
               <label htmlFor="particle-color" className={styles.colorControl}>
@@ -578,11 +578,7 @@ export default function AetherParticles() {
                   style={{ "--preview-color": particleColor }}
                 />
                 <span className={styles.colorMeta}>
-                  <span className={styles.colorName}>Custom Color</span>
                   <span className={styles.colorValue}>{particleColor.toUpperCase()}</span>
-                </span>
-                <span className={styles.colorArrow} aria-hidden="true">
-                  |
                 </span>
                 <input
                   id="particle-color"
