@@ -17,7 +17,7 @@ const PRESETS = {
   saturn: { label: "Saturn", color: "#caa46b", icon: "\u{1FA90}", rotation: "side" },
   buddha: { label: "Buddha", color: "#b7791f", icon: "\u2638", rotation: "drift" },
   flower: { label: "Flower", color: "#e11d48", icon: "\u273F", rotation: "bloom" },
-  lotus: { label: "Lotus", color: "#ec4899", icon: "\u{1FAB7}", rotation: "bloomFront" },
+  lotus: { label: "Lotus", color: "#ec4899", icon: "\u{1FAB7}", rotation: "lotusSweep" },
   fireworks: { label: "Fireworks", color: "#f97316", icon: "\u2726", rotation: "side" },
   supernova: { label: "Supernova", color: "#8b5cf6", icon: "\u273A", rotation: "side" },
   cube: { label: "Cube", color: "#14b8a6", icon: "\u25A3", rotation: "full" },
@@ -270,6 +270,12 @@ export default function AetherParticles() {
       if (rotationMode === "full") {
         particles.rotation.y += 0.002;
         particles.rotation.x += 0.001;
+        particles.rotation.z += (0 - particles.rotation.z) * 0.08;
+      } else if (rotationMode === "lotusSweep") {
+        const targetX = -0.2 + Math.cos(time * 0.42) * 0.025;
+        const targetY = (Math.sin(time * 0.42) * 0.5 + 0.5) * 1.12;
+        particles.rotation.x += (targetX - particles.rotation.x) * 0.08;
+        particles.rotation.y += (targetY - particles.rotation.y) * 0.08;
         particles.rotation.z += (0 - particles.rotation.z) * 0.08;
       } else if (rotationMode === "drift") {
         const targetX = Math.sin(time * 0.95) * 0.13;
@@ -716,23 +722,62 @@ function createFlowerPositions(particleCount) {
   return targetPositions;
 }
 
-// Lotus uses layered petals plus a bowl-like vertical curve to keep the flower readable from the front.
+// Lotus uses layered petal crowns so the blossom reads closer to a real open flower.
 function createLotusPositions(particleCount) {
   const targetPositions = new Float32Array(particleCount * 3);
+  const layers = [
+    { count: 8, length: 4.3, width: 1.2, rise: 0.65, curl: 0.6, offset: 0, weight: 0.46 },
+    { count: 6, length: 3.4, width: 0.98, rise: 1.25, curl: 0.9, offset: Math.PI / 6, weight: 0.34 },
+    { count: 4, length: 2.35, width: 0.72, rise: 1.95, curl: 1.2, offset: Math.PI / 4, weight: 0.2 },
+  ];
 
   for (let index = 0; index < particleCount; index += 1) {
     const offset = index * 3;
-    const theta = Math.random() * Math.PI * 2;
-    const radiusProgress = Math.sqrt(Math.random());
-    const radius = Math.cos(4 * theta) * radiusProgress * 2.55;
-    const x = radius * Math.cos(theta);
-    const y = radius * Math.sin(theta) * 0.84;
-    const z = radiusProgress * radiusProgress * 0.42 - Math.abs(radius) * 0.08 - 0.08;
-    const [volumeX, volumeY, volumeZ] = addVolume(x, y, z, 0.05);
+    const isCore = Math.random() < 0.12;
 
-    targetPositions[offset] = volumeX * 2.3;
-    targetPositions[offset + 1] = volumeY * 2.3;
-    targetPositions[offset + 2] = volumeZ * 1.7;
+    if (isCore) {
+      const coreRadius = Math.sqrt(Math.random()) * 0.8;
+      const coreAngle = Math.random() * Math.PI * 2;
+      const [volumeX, volumeY, volumeZ] = addVolume(
+        Math.cos(coreAngle) * coreRadius,
+        0.55 + Math.random() * 0.4,
+        Math.sin(coreAngle) * coreRadius * 0.78,
+        0.08,
+      );
+
+      targetPositions[offset] = volumeX;
+      targetPositions[offset + 1] = volumeY;
+      targetPositions[offset + 2] = volumeZ;
+      continue;
+    }
+
+    const selector = Math.random();
+    const layer =
+      selector < layers[0].weight
+        ? layers[0]
+        : selector < layers[0].weight + layers[1].weight
+          ? layers[1]
+          : layers[2];
+
+    const petalIndex = Math.floor(Math.random() * layer.count);
+    const angle = (petalIndex / layer.count) * Math.PI * 2 + layer.offset;
+    const progress = Math.sqrt(Math.random());
+    const side = (Math.random() * 2 - 1) * layer.width * Math.pow(1 - progress, 0.52);
+    const forward = lerp(0.28, layer.length, progress);
+    const openCurve = Math.sin(progress * Math.PI) * layer.curl;
+    const localX = Math.cos(angle) * forward - Math.sin(angle) * side;
+    const localZ = (Math.sin(angle) * forward + Math.cos(angle) * side) * 0.78;
+    const localY =
+      -0.95 +
+      layer.rise * progress +
+      openCurve -
+      Math.abs(side) * 0.16 -
+      Math.pow(1 - progress, 1.6) * 0.3;
+    const [volumeX, volumeY, volumeZ] = addVolume(localX, localY, localZ, 0.055);
+
+    targetPositions[offset] = volumeX;
+    targetPositions[offset + 1] = volumeY;
+    targetPositions[offset + 2] = volumeZ;
   }
 
   return targetPositions;
