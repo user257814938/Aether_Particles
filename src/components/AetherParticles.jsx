@@ -19,7 +19,7 @@ const PRESETS = {
   flower: { label: "Flower", color: "#e11d48", icon: "\u273F", rotation: "lotusSweep" },
   lotus: { label: "Lotus", color: "#ec4899", icon: "\u{1FAB7}", rotation: "lotusSweep" },
   fireworks: { label: "Fireworks", color: "#b91c1c", icon: "\u2726", rotation: "full" },
-  supernova: { label: "Supernova", color: "#8b5cf6", icon: "\u273A", rotation: "full" },
+  supernova: { label: "Supernova", color: "#8b5cf6", icon: "\u273A", rotation: "galaxyTilt" },
   cube: { label: "Cube", color: "#14b8a6", icon: "\u25A3", rotation: "full" },
   square: { label: "Square", color: "#d97706", icon: "\u25A0", rotation: "drift" },
 };
@@ -44,6 +44,7 @@ export default function AetherParticles() {
   const previewVideoRef = useRef(null);
   const animationFrameRef = useRef(0);
   const targetPositionsRef = useRef(new Float32Array());
+  const targetColorsRef = useRef(new Float32Array());
   const handsRef = useRef(null);
   const mediaStreamRef = useRef(null);
   const lastVideoTimeRef = useRef(-1);
@@ -68,12 +69,25 @@ export default function AetherParticles() {
   useEffect(() => {
     activePresetRef.current = preset;
     if (particleCountRef.current > 0) {
-      targetPositionsRef.current = buildPresetPositions(preset, particleCountRef.current);
+      const presetData = buildPresetData(
+        preset,
+        particleCountRef.current,
+        PRESETS[preset].color,
+      );
+      targetPositionsRef.current = presetData.positions;
+      targetColorsRef.current = presetData.colors;
     }
   }, [preset]);
 
   useEffect(() => {
     colorTargetRef.current.set(particleColor);
+    if (particleCountRef.current > 0 && activePresetRef.current !== "supernova") {
+      targetColorsRef.current = buildPresetColors(
+        activePresetRef.current,
+        particleCountRef.current,
+        particleColor,
+      );
+    }
   }, [particleColor]);
 
   useEffect(() => {
@@ -113,16 +127,19 @@ export default function AetherParticles() {
 
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(particleCount * 3);
+    const colors = createSolidColors(particleCount, PRESETS.sphere.color);
 
     for (let index = 0; index < positions.length; index += 1) {
       positions[index] = (Math.random() - 0.5) * 20;
     }
 
     geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
 
     const material = new THREE.PointsMaterial({
       size: 0.05,
-      color: PRESETS.sphere.color,
+      color: "#ffffff",
+      vertexColors: true,
       transparent: true,
       opacity: 0.8,
       depthWrite: false,
@@ -132,7 +149,13 @@ export default function AetherParticles() {
     const particles = new THREE.Points(geometry, material);
     scene.add(particles);
 
-    targetPositionsRef.current = buildPresetPositions(activePresetRef.current, particleCount);
+    const initialPresetData = buildPresetData(
+      activePresetRef.current,
+      particleCount,
+      PRESETS[activePresetRef.current].color,
+    );
+    targetPositionsRef.current = initialPresetData.positions;
+    targetColorsRef.current = initialPresetData.colors;
 
     const updateStatus = (nextStatus) => {
       if (!mountedRef.current) {
@@ -244,10 +267,11 @@ export default function AetherParticles() {
       }
 
       const positionAttribute = geometry.attributes.position;
+      const colorAttribute = geometry.attributes.color;
       const targetPositions = targetPositionsRef.current;
+      const targetColors = targetColorsRef.current;
       currentExpansionRef.current +=
         (targetExpansionRef.current - currentExpansionRef.current) * 0.1;
-      material.color.lerp(colorTargetRef.current, 0.05);
 
       for (let index = 0; index < particleCount; index += 1) {
         const offset = index * 3;
@@ -260,9 +284,16 @@ export default function AetherParticles() {
           (targetY - positionAttribute.array[offset + 1]) * 0.05;
         positionAttribute.array[offset + 2] +=
           (targetZ - positionAttribute.array[offset + 2]) * 0.05;
+
+        colorAttribute.array[offset] += (targetColors[offset] - colorAttribute.array[offset]) * 0.08;
+        colorAttribute.array[offset + 1] +=
+          (targetColors[offset + 1] - colorAttribute.array[offset + 1]) * 0.08;
+        colorAttribute.array[offset + 2] +=
+          (targetColors[offset + 2] - colorAttribute.array[offset + 2]) * 0.08;
       }
 
       positionAttribute.needsUpdate = true;
+      colorAttribute.needsUpdate = true;
       // Silhouettes stay readable from the front, horizontal models orbit sideways, volumetric objects spin freely.
       const rotationMode = PRESETS[activePresetRef.current].rotation;
       const time = performance.now() * 0.001;
@@ -295,6 +326,12 @@ export default function AetherParticles() {
         particles.rotation.x += (targetX - particles.rotation.x) * 0.08;
         particles.rotation.y += (targetY - particles.rotation.y) * 0.08;
         particles.rotation.z += 0.0022;
+      } else if (rotationMode === "galaxyTilt") {
+        const targetX = 1.72 + Math.sin(time * 0.56) * 0.62;
+        const targetY = Math.cos(time * 0.44) * 0.18;
+        particles.rotation.x += (targetX - particles.rotation.x) * 0.08;
+        particles.rotation.y += (targetY - particles.rotation.y) * 0.08;
+        particles.rotation.z += (0 - particles.rotation.z) * 0.08;
       } else if (rotationMode === "side") {
         const targetX = 0.36 + Math.sin(time * 0.9) * 0.13;
         const targetY = 0.82 + Math.cos(time * 0.52) * 0.08;
@@ -603,6 +640,25 @@ export default function AetherParticles() {
   );
 }
 
+function buildPresetData(type, particleCount, baseColor) {
+  if (type === "supernova") {
+    return createSupernovaData(particleCount);
+  }
+
+  return {
+    positions: buildPresetPositions(type, particleCount),
+    colors: buildPresetColors(type, particleCount, baseColor),
+  };
+}
+
+function buildPresetColors(type, particleCount, baseColor) {
+  if (type === "supernova") {
+    return createSupernovaData(particleCount).colors;
+  }
+
+  return createSolidColors(particleCount, baseColor);
+}
+
 function buildPresetPositions(type, particleCount) {
   switch (type) {
     case "heart":
@@ -617,8 +673,6 @@ function buildPresetPositions(type, particleCount) {
       return createLotusPositions(particleCount);
     case "fireworks":
       return createFireworksPositions(particleCount);
-    case "supernova":
-      return createSupernovaPositions(particleCount);
     case "cube":
       return createCubePositions(particleCount);
     case "square":
@@ -647,6 +701,20 @@ function createSpherePositions(particleCount) {
   }
 
   return targetPositions;
+}
+
+function createSolidColors(particleCount, hexColor) {
+  const colors = new Float32Array(particleCount * 3);
+  const color = new THREE.Color(hexColor);
+
+  for (let index = 0; index < particleCount; index += 1) {
+    const offset = index * 3;
+    colors[offset] = color.r;
+    colors[offset + 1] = color.g;
+    colors[offset + 2] = color.b;
+  }
+
+  return colors;
 }
 
 function createHeartPositions(particleCount) {
@@ -813,39 +881,85 @@ function createFireworksPositions(particleCount) {
   return targetPositions;
 }
 
-function createSupernovaPositions(particleCount) {
-  const targetPositions = new Float32Array(particleCount * 3);
-  const rayCount = 7;
+function createSupernovaData(particleCount) {
+  const positions = new Float32Array(particleCount * 3);
+  const colors = new Float32Array(particleCount * 3);
+  const coreColor = new THREE.Color("#ffe7b3");
+  const warmCoreColor = new THREE.Color("#ffb58e");
+  const haloColor = new THREE.Color("#f3f8ff");
+  const armColor = new THREE.Color("#6ec5ff");
+  const blueDustColor = new THREE.Color("#294b92");
+  const dustColor = new THREE.Color("#d9c3c8");
+  const knotColor = new THREE.Color("#ffffff");
 
   for (let index = 0; index < particleCount; index += 1) {
     const offset = index * 3;
-    const isCore = Math.random() < 0.34;
+    const branch = Math.random();
+    const color = new THREE.Color();
+    let x;
+    let y;
+    let z;
+    let radiusRatio;
 
-    if (isCore) {
-      const coreRadius = Math.pow(Math.random(), 1.9) * 1.45;
-      const coreAngle = Math.random() * Math.PI * 2;
-      targetPositions[offset] = Math.cos(coreAngle) * coreRadius + (Math.random() - 0.5) * 0.14;
-      targetPositions[offset + 1] =
-        Math.sin(coreAngle) * coreRadius + (Math.random() - 0.5) * 0.14;
-      targetPositions[offset + 2] = (Math.random() - 0.5) * 0.28;
-      continue;
+    if (branch < 0.24) {
+      const radius = Math.pow(Math.random(), 1.85) * 1.9;
+      const angle = Math.random() * Math.PI * 2;
+      x = Math.cos(angle) * radius * 1.08 + (Math.random() - 0.5) * 0.16;
+      y = Math.sin(angle) * radius * 0.72 + (Math.random() - 0.5) * 0.14;
+      z = (Math.random() - 0.5) * 0.34;
+      radiusRatio = radius / 8.2;
+      color.copy(coreColor).lerp(warmCoreColor, Math.random() * 0.45);
+    } else if (branch < 0.68) {
+      const radius = lerp(0.7, 7.6, Math.pow(Math.random(), 0.62));
+      const angle = Math.random() * Math.PI * 2;
+      x = Math.cos(angle) * radius * 1.42 + (Math.random() - 0.5) * 0.3;
+      y = Math.sin(angle) * radius * 0.82 + (Math.random() - 0.5) * 0.26;
+      z = (Math.random() - 0.5) * (0.18 + radius * 0.065);
+      radiusRatio = radius / 8.2;
+      color.copy(haloColor).lerp(armColor, radiusRatio * 0.7);
+      if (Math.random() < 0.18) {
+        color.lerp(dustColor, 0.35);
+      }
+    } else {
+      const armIndex = Math.floor(Math.random() * 4);
+      const radius = lerp(0.9, 8.2, Math.pow(Math.random(), 0.55));
+      const twist = radius * 0.88;
+      const angle =
+        (armIndex / 4) * Math.PI * 2 +
+        twist +
+        (Math.random() - 0.5) * (0.14 + radius * 0.018);
+      const width = (Math.random() - 0.5) * (0.2 + radius * 0.12);
+      x = Math.cos(angle) * radius * 1.38 - Math.sin(angle) * width;
+      y = Math.sin(angle) * radius * 0.8 + Math.cos(angle) * width * 0.82;
+      z = (Math.random() - 0.5) * (0.16 + radius * 0.075);
+      radiusRatio = radius / 8.2;
+
+      color.copy(haloColor).lerp(armColor, 0.55 + radiusRatio * 0.35);
+      if (Math.random() < 0.12) {
+        color.lerp(knotColor, 0.55);
+      }
+      if (Math.random() < 0.16) {
+        color.lerp(dustColor, 0.42);
+      }
+      if (radiusRatio > 0.6) {
+        color.lerp(blueDustColor, (radiusRatio - 0.6) / 0.4);
+      }
     }
 
-    const rayAngle =
-      (Math.floor(Math.random() * rayCount) / rayCount) * Math.PI * 2 +
-      (Math.random() - 0.5) * 0.18;
-    const distance = lerp(0.8, 7.4, Math.pow(Math.random(), 0.46));
-    const plume = Math.sin(distance * 0.85) * 0.22;
-    const width = (Math.random() - 0.5) * (0.08 + distance * 0.06);
+    positions[offset] = x;
+    positions[offset + 1] = y;
+    positions[offset + 2] = z;
 
-    targetPositions[offset] =
-      Math.cos(rayAngle) * distance - Math.sin(rayAngle) * width + plume;
-    targetPositions[offset + 1] =
-      Math.sin(rayAngle) * distance + Math.cos(rayAngle) * width - plume;
-    targetPositions[offset + 2] = (Math.random() - 0.5) * (0.12 + distance * 0.04);
+    if (branch >= 0.22 && radiusRatio < 0.24) {
+      color.lerp(coreColor, 0.35);
+    }
+
+    colors[offset] = color.r;
+    colors[offset + 1] = color.g;
+    colors[offset + 2] = color.b;
   }
 
-  return targetPositions;
+  return { positions, colors };
 }
 
 function createCubePositions(particleCount) {
