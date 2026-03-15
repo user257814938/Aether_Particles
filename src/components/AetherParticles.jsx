@@ -16,10 +16,10 @@ const PRESETS = {
   heart: { label: "Heart", color: "#dc2626", icon: "\u2665", rotation: "drift" },
   saturn: { label: "Saturn", color: "#caa46b", icon: "\u{1FA90}", rotation: "side" },
   buddha: { label: "Buddha", color: "#b7791f", icon: "\u2638", rotation: "drift" },
-  flower: { label: "Flower", color: "#e11d48", icon: "\u273F", rotation: "bloom" },
+  flower: { label: "Flower", color: "#e11d48", icon: "\u273F", rotation: "lotusSweep" },
   lotus: { label: "Lotus", color: "#ec4899", icon: "\u{1FAB7}", rotation: "lotusSweep" },
-  fireworks: { label: "Fireworks", color: "#f97316", icon: "\u2726", rotation: "side" },
-  supernova: { label: "Supernova", color: "#8b5cf6", icon: "\u273A", rotation: "side" },
+  fireworks: { label: "Fireworks", color: "#b91c1c", icon: "\u2726", rotation: "full" },
+  supernova: { label: "Supernova", color: "#8b5cf6", icon: "\u273A", rotation: "full" },
   cube: { label: "Cube", color: "#14b8a6", icon: "\u25A3", rotation: "full" },
   square: { label: "Square", color: "#d97706", icon: "\u25A0", rotation: "drift" },
 };
@@ -787,12 +787,12 @@ function createLotusPositions(particleCount) {
 function createBuddhaPositions(particleCount) {
   return sampleMaskShape(
     particleCount,
-    [-1.25, 1.25],
-    [-1.32, 1.36],
+    [-1.32, 1.32],
+    [-1.46, 1.5],
     (x, y) => buddhaMask(x, y),
     (x, y) => {
-      const centered = 1 - Math.min(1, Math.abs(x) * 0.8 + Math.abs(y) * 0.18);
-      return (Math.random() - 0.5) * 0.16 + centered * 0.26;
+      const centered = 1 - Math.min(1, Math.abs(x) * 0.72 + Math.abs(y) * 0.16);
+      return (Math.random() - 0.5) * 0.14 + centered * 0.28;
     },
   );
 }
@@ -802,16 +802,12 @@ function createFireworksPositions(particleCount) {
 
   for (let index = 0; index < particleCount; index += 1) {
     const offset = index * 3;
-    const burstCount = 10;
-    const burstAngle = (Math.floor(Math.random() * burstCount) / burstCount) * Math.PI * 2;
-    const angle = burstAngle + (Math.random() - 0.5) * 0.26;
-    const distance = lerp(1.1, 7.9, Math.sqrt(Math.random()));
-    const spread = 0.22 + distance * 0.035;
+    const angle = Math.random() * Math.PI * 2;
+    const distance = Math.random() * 8;
 
-    targetPositions[offset] = Math.cos(angle) * distance + (Math.random() - 0.5) * spread;
-    targetPositions[offset + 1] =
-      Math.sin(angle) * distance + (Math.random() - 0.5) * spread;
-    targetPositions[offset + 2] = (Math.random() - 0.5) * 0.7;
+    targetPositions[offset] = Math.cos(angle) * distance;
+    targetPositions[offset + 1] = Math.sin(angle) * distance;
+    targetPositions[offset + 2] = (Math.random() - 0.5) * distance;
   }
 
   return targetPositions;
@@ -819,24 +815,34 @@ function createFireworksPositions(particleCount) {
 
 function createSupernovaPositions(particleCount) {
   const targetPositions = new Float32Array(particleCount * 3);
-  const armCount = 14;
+  const rayCount = 7;
 
   for (let index = 0; index < particleCount; index += 1) {
     const offset = index * 3;
-    const armAngle = (Math.floor(Math.random() * armCount) / armCount) * Math.PI * 2;
-    const angle = armAngle + (Math.random() - 0.5) * 0.22;
-    const radius = lerp(0.25, 6.2, Math.pow(Math.random(), 0.52));
-    const flare = radius * radius * 0.015;
+    const isCore = Math.random() < 0.34;
 
-    targetPositions[offset] = Math.cos(angle) * radius + (Math.random() - 0.5) * flare;
-    targetPositions[offset + 1] = Math.sin(angle) * radius + (Math.random() - 0.5) * flare;
-    targetPositions[offset + 2] = (Math.random() - 0.5) * 0.55;
-
-    if (index < particleCount * 0.16) {
-      targetPositions[offset] *= 0.38;
-      targetPositions[offset + 1] *= 0.38;
-      targetPositions[offset + 2] *= 0.3;
+    if (isCore) {
+      const coreRadius = Math.pow(Math.random(), 1.9) * 1.45;
+      const coreAngle = Math.random() * Math.PI * 2;
+      targetPositions[offset] = Math.cos(coreAngle) * coreRadius + (Math.random() - 0.5) * 0.14;
+      targetPositions[offset + 1] =
+        Math.sin(coreAngle) * coreRadius + (Math.random() - 0.5) * 0.14;
+      targetPositions[offset + 2] = (Math.random() - 0.5) * 0.28;
+      continue;
     }
+
+    const rayAngle =
+      (Math.floor(Math.random() * rayCount) / rayCount) * Math.PI * 2 +
+      (Math.random() - 0.5) * 0.18;
+    const distance = lerp(0.8, 7.4, Math.pow(Math.random(), 0.46));
+    const plume = Math.sin(distance * 0.85) * 0.22;
+    const width = (Math.random() - 0.5) * (0.08 + distance * 0.06);
+
+    targetPositions[offset] =
+      Math.cos(rayAngle) * distance - Math.sin(rayAngle) * width + plume;
+    targetPositions[offset + 1] =
+      Math.sin(rayAngle) * distance + Math.cos(rayAngle) * width - plume;
+    targetPositions[offset + 2] = (Math.random() - 0.5) * (0.12 + distance * 0.04);
   }
 
   return targetPositions;
@@ -949,20 +955,59 @@ function buddhaMask(x, y) {
   const inCircle = (cx, cy, radius) => (x - cx) ** 2 + (y - cy) ** 2 <= radius ** 2;
   const inEllipse = (cx, cy, rx, ry) =>
     ((x - cx) ** 2) / (rx ** 2) + ((y - cy) ** 2) / (ry ** 2) <= 1;
+  const inRotatedEllipse = (cx, cy, rx, ry, angle) => {
+    const dx = x - cx;
+    const dy = y - cy;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    const xr = dx * cos + dy * sin;
+    const yr = -dx * sin + dy * cos;
+    return (xr ** 2) / (rx ** 2) + (yr ** 2) / (ry ** 2) <= 1;
+  };
 
-  const head = inCircle(0, 0.86, 0.24) || inCircle(0, 1.12, 0.12);
-  const shoulders = inEllipse(0, 0.44, 0.62, 0.32);
-  const torso = inEllipse(0, 0.04, 0.42, 0.52);
-  const arms = inEllipse(-0.46, 0.05, 0.16, 0.28) || inEllipse(0.46, 0.05, 0.16, 0.28);
-  const lap = inEllipse(0, -0.54, 0.9, 0.36);
-  const lotus =
-    inEllipse(-0.42, -0.88, 0.34, 0.16) ||
-    inEllipse(0, -0.92, 0.44, 0.18) ||
-    inEllipse(0.42, -0.88, 0.34, 0.16);
-  const innerGap =
-    inEllipse(0, 0.2, 0.15, 0.26) && y < 0.46 && y > -0.08 && Math.abs(x) < 0.22;
+  const head =
+    inEllipse(0, 0.88, 0.28, 0.34) ||
+    inCircle(0, 1.22, 0.12) ||
+    inCircle(-0.07, 1.12, 0.085) ||
+    inCircle(0.07, 1.12, 0.085) ||
+    inCircle(-0.12, 1.02, 0.075) ||
+    inCircle(0.12, 1.02, 0.075) ||
+    inCircle(-0.17, 0.9, 0.07) ||
+    inCircle(0.17, 0.9, 0.07);
+  const ears = inEllipse(-0.3, 0.78, 0.08, 0.24) || inEllipse(0.3, 0.78, 0.08, 0.24);
+  const neck = inEllipse(0, 0.53, 0.14, 0.11);
+  const shoulders = inEllipse(0, 0.33, 0.82, 0.31);
+  const torso = inEllipse(0, -0.02, 0.54, 0.68);
+  const leftSleeve = inRotatedEllipse(-0.56, -0.02, 0.21, 0.44, 0.18);
+  const rightSleeve = inRotatedEllipse(0.58, 0.02, 0.2, 0.42, -0.18);
+  const raisedForearm = inRotatedEllipse(0.14, 0.03, 0.12, 0.31, 0.08);
+  const raisedHand = inEllipse(0.16, 0.25, 0.12, 0.16);
+  const fingers = inRotatedEllipse(0.2, 0.38, 0.055, 0.17, 0.04);
+  const lapLeft = inRotatedEllipse(-0.5, -0.84, 0.56, 0.24, -0.26);
+  const lapRight = inRotatedEllipse(0.5, -0.84, 0.56, 0.24, 0.26);
+  const centerCloth = inEllipse(0, -0.72, 0.3, 0.28) || inEllipse(0, -1.0, 0.18, 0.18);
+  const lowerRobe =
+    inRotatedEllipse(-0.22, -0.56, 0.24, 0.2, -0.35) ||
+    inRotatedEllipse(0.24, -0.48, 0.26, 0.18, 0.28) ||
+    inEllipse(0.08, -0.38, 0.2, 0.12);
 
-  return (head || shoulders || torso || arms || lap || lotus) && !innerGap;
+  const silhouette =
+    head ||
+    ears ||
+    neck ||
+    shoulders ||
+    torso ||
+    leftSleeve ||
+    rightSleeve ||
+    raisedForearm ||
+    raisedHand ||
+    fingers ||
+    lapLeft ||
+    lapRight ||
+    centerCloth ||
+    lowerRobe;
+
+  return silhouette;
 }
 
 function addVolume(x, y, z, amount) {
