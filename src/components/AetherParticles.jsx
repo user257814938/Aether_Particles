@@ -617,7 +617,9 @@ export default function AetherParticles() {
 
         </div>
 
-        <button
+        <div className={styles.guideBlock}>
+          <span className={styles.label}>Guide</span>
+          <button
           type="button"
           className={styles.helpButton}
           onClick={() => setIsGuideOpen(true)}
@@ -625,8 +627,9 @@ export default function AetherParticles() {
           <span className={styles.helpButtonIcon} aria-hidden="true">
             ↗
           </span>
-          <span>How to use the system</span>
-        </button>
+          <span className={styles.helpButtonText}>How to use the system</span>
+          </button>
+        </div>
       </section>
 
       <div className={styles.cameraDock} style={cameraDockStyle}>
