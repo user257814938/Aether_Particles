@@ -13,15 +13,15 @@ const { Hands } = handsPackage;
 // - `rotation` decides whether the shape can tilt vertically or should stay front-facing
 const PRESETS = {
   sphere: { label: "Sphere", color: "#2563eb", icon: "\u25CF", rotation: "full" },
-  heart: { label: "Heart", color: "#dc2626", icon: "\u2665", rotation: "front" },
-  saturn: { label: "Saturn", color: "#caa46b", icon: "\u{1FA90}", rotation: "horizontal" },
-  buddha: { label: "Buddha", color: "#b7791f", icon: "\u2638", rotation: "front" },
-  flower: { label: "Flower", color: "#e11d48", icon: "\u273F", rotation: "front" },
-  lotus: { label: "Lotus", color: "#ec4899", icon: "\u{1FAB7}", rotation: "front" },
-  fireworks: { label: "Fireworks", color: "#f97316", icon: "\u2726", rotation: "front" },
-  supernova: { label: "Supernova", color: "#8b5cf6", icon: "\u273A", rotation: "front" },
+  heart: { label: "Heart", color: "#dc2626", icon: "\u2665", rotation: "drift" },
+  saturn: { label: "Saturn", color: "#caa46b", icon: "\u{1FA90}", rotation: "side" },
+  buddha: { label: "Buddha", color: "#b7791f", icon: "\u2638", rotation: "drift" },
+  flower: { label: "Flower", color: "#e11d48", icon: "\u273F", rotation: "bloom" },
+  lotus: { label: "Lotus", color: "#ec4899", icon: "\u{1FAB7}", rotation: "bloomFront" },
+  fireworks: { label: "Fireworks", color: "#f97316", icon: "\u2726", rotation: "side" },
+  supernova: { label: "Supernova", color: "#8b5cf6", icon: "\u273A", rotation: "side" },
   cube: { label: "Cube", color: "#14b8a6", icon: "\u25A3", rotation: "full" },
-  square: { label: "Square", color: "#d97706", icon: "\u25A0", rotation: "front" },
+  square: { label: "Square", color: "#d97706", icon: "\u25A0", rotation: "drift" },
 };
 
 const PRESET_SECTIONS = [
@@ -265,18 +265,65 @@ export default function AetherParticles() {
       positionAttribute.needsUpdate = true;
       // Silhouettes stay readable from the front, horizontal models orbit sideways, volumetric objects spin freely.
       const rotationMode = PRESETS[activePresetRef.current].rotation;
+      const time = performance.now() * 0.001;
+
       if (rotationMode === "full") {
         particles.rotation.y += 0.002;
         particles.rotation.x += 0.001;
-      } else if (rotationMode === "horizontal") {
-        particles.rotation.y += 0.002;
-        particles.rotation.x += (0 - particles.rotation.x) * 0.08;
+        particles.rotation.z += (0 - particles.rotation.z) * 0.08;
+      } else if (rotationMode === "drift") {
+        const targetX = Math.sin(time * 0.95) * 0.13;
+        const targetY = Math.cos(time * 0.72) * 0.22;
+        particles.rotation.x += (targetX - particles.rotation.x) * 0.08;
+        particles.rotation.y += (targetY - particles.rotation.y) * 0.08;
+        particles.rotation.z += (0 - particles.rotation.z) * 0.08;
+      } else if (rotationMode === "bloom") {
+        const targetX = Math.sin(time * 0.8) * 0.15;
+        const targetY = Math.cos(time * 0.64) * 0.18;
+        particles.rotation.x += (targetX - particles.rotation.x) * 0.08;
+        particles.rotation.y += (targetY - particles.rotation.y) * 0.08;
+        particles.rotation.z += 0.0025;
+      } else if (rotationMode === "bloomFront") {
+        const targetX = Math.sin(time * 0.74) * 0.08;
+        const targetY = Math.cos(time * 0.58) * 0.1;
+        particles.rotation.x += (targetX - particles.rotation.x) * 0.08;
+        particles.rotation.y += (targetY - particles.rotation.y) * 0.08;
+        particles.rotation.z += 0.0022;
+      } else if (rotationMode === "side") {
+        const targetX = 0.36 + Math.sin(time * 0.9) * 0.13;
+        const targetY = 0.82 + Math.cos(time * 0.52) * 0.08;
+        particles.rotation.x += (targetX - particles.rotation.x) * 0.08;
+        particles.rotation.y += (targetY - particles.rotation.y) * 0.08;
+        particles.rotation.z += (0 - particles.rotation.z) * 0.08;
       } else {
         particles.rotation.y += (0 - particles.rotation.y) * 0.08;
         particles.rotation.x += (0 - particles.rotation.x) * 0.08;
+        particles.rotation.z += (0 - particles.rotation.z) * 0.08;
       }
 
       renderer.render(scene, camera);
+    };
+
+    const requestCameraStream = async () => {
+      try {
+        return await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: "user",
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+          },
+          audio: false,
+        });
+      } catch (error) {
+        if (error?.name === "OverconstrainedError") {
+          return navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false,
+          });
+        }
+
+        throw error;
+      }
     };
 
     const boot = async () => {
@@ -297,14 +344,7 @@ export default function AetherParticles() {
         hands.onResults(handleResults);
         handsRef.current = hands;
 
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: "user",
-            width: { ideal: 640 },
-            height: { ideal: 480 },
-          },
-          audio: false,
-        });
+        const stream = await requestCameraStream();
 
         mediaStreamRef.current = stream;
         hiddenVideo.srcObject = stream;
@@ -320,12 +360,29 @@ export default function AetherParticles() {
         });
         updateForceLevel(0);
       } catch (error) {
-        console.error(error);
         updateForceLevel(0);
+
+        const cameraMessageByError = {
+          NotAllowedError:
+            "Acces camera refuse. Autorise la camera dans le navigateur pour activer le controle gestuel.",
+          NotReadableError:
+            "La camera est deja utilisee par une autre application ou indisponible. Ferme l'autre application puis recharge la page.",
+          NotFoundError:
+            "Aucune camera detectee sur cet appareil. Le preset reste visible, mais sans controle gestuel.",
+          AbortError:
+            "Le demarrage camera a ete interrompu. Recharge la page pour reessayer.",
+        };
+
+        if (!cameraMessageByError[error?.name]) {
+          console.error(error);
+        }
+
         updateStatus({
           id: "camera-error",
           tone: "error",
-          text: "Acces camera refuse ou indisponible. Le preset reste visible, mais sans controle gestuel.",
+          text:
+            cameraMessageByError[error?.name] ??
+            "Acces camera refuse ou indisponible. Le preset reste visible, mais sans controle gestuel.",
         });
       }
     };
@@ -613,26 +670,28 @@ function createHeartPositions(particleCount) {
 
 function createSaturnPositions(particleCount) {
   const targetPositions = new Float32Array(particleCount * 3);
+  const coreCount = Math.floor(particleCount * 0.46);
 
   for (let index = 0; index < particleCount; index += 1) {
     const offset = index * 3;
 
-    if (index < particleCount * 0.4) {
+    if (index < coreCount) {
       const u = Math.random();
       const v = Math.random();
       const theta = 2 * Math.PI * u;
       const phi = Math.acos(2 * v - 1);
+      const radialDistance = Math.cbrt(Math.random()) * 3.5;
 
-      targetPositions[offset] = 3.5 * Math.sin(phi) * Math.cos(theta);
-      targetPositions[offset + 1] = 3.5 * Math.sin(phi) * Math.sin(theta);
-      targetPositions[offset + 2] = 3.5 * Math.cos(phi);
+      targetPositions[offset] = radialDistance * Math.sin(phi) * Math.cos(theta);
+      targetPositions[offset + 1] = radialDistance * Math.sin(phi) * Math.sin(theta);
+      targetPositions[offset + 2] = radialDistance * Math.cos(phi);
       continue;
     }
 
-    const distance = 5 + Math.random() * 3;
+    const distance = 4.8 + Math.random() * 3.2;
     const angle = Math.random() * Math.PI * 2;
     targetPositions[offset] = Math.cos(angle) * distance;
-    targetPositions[offset + 1] = (Math.random() - 0.5) * 0.4;
+    targetPositions[offset + 1] = (Math.random() - 0.5) * 0.6;
     targetPositions[offset + 2] = Math.sin(angle) * distance;
   }
 
@@ -667,13 +726,13 @@ function createLotusPositions(particleCount) {
     const radiusProgress = Math.sqrt(Math.random());
     const radius = Math.cos(4 * theta) * radiusProgress * 2.55;
     const x = radius * Math.cos(theta);
-    const z = radius * Math.sin(theta);
-    const y = radiusProgress * radiusProgress * 1.5 - Math.abs(radius) * 0.3 - 0.5;
-    const [volumeX, volumeY, volumeZ] = addVolume(x, y, z, 0.07);
+    const y = radius * Math.sin(theta) * 0.84;
+    const z = radiusProgress * radiusProgress * 0.42 - Math.abs(radius) * 0.08 - 0.08;
+    const [volumeX, volumeY, volumeZ] = addVolume(x, y, z, 0.05);
 
-    targetPositions[offset] = volumeX * 2.2;
-    targetPositions[offset + 1] = volumeY * 2.2;
-    targetPositions[offset + 2] = volumeZ * 2.2;
+    targetPositions[offset] = volumeX * 2.3;
+    targetPositions[offset + 1] = volumeY * 2.3;
+    targetPositions[offset + 2] = volumeZ * 1.7;
   }
 
   return targetPositions;
@@ -770,29 +829,37 @@ function createCubePositions(particleCount) {
 // Square is intentionally tighter than the previous version so it reads as less zoomed-out on screen.
 function createSquarePositions(particleCount) {
   const targetPositions = new Float32Array(particleCount * 3);
-  const halfSize = 2.95;
-  const thickness = 0.16;
+  const halfSize = 6.7;
+  const thickness = 0.28;
 
   for (let index = 0; index < particleCount; index += 1) {
     const offset = index * 3;
-    const edge = index % 4;
-    const t = (Math.random() - 0.5) * halfSize * 2;
-    const depth = (Math.random() - 0.5) * 0.16;
-    const borderJitter = (Math.random() - 0.5) * thickness;
-    const bandDrift = Math.random() < 0.2 ? (Math.random() - 0.5) * 0.5 : 0;
+    const depth = (Math.random() - 0.5) * 0.2;
 
-    if (edge === 0) {
-      targetPositions[offset] = -halfSize + borderJitter;
-      targetPositions[offset + 1] = t + bandDrift;
-    } else if (edge === 1) {
-      targetPositions[offset] = halfSize + borderJitter;
-      targetPositions[offset + 1] = t + bandDrift;
-    } else if (edge === 2) {
-      targetPositions[offset] = t + bandDrift;
-      targetPositions[offset + 1] = -halfSize + borderJitter;
+    // Keep the square contour dominant, then lightly seed particles inside like the heart shape.
+    if (Math.random() < 0.82) {
+      const edge = Math.floor(Math.random() * 4);
+      const t = (Math.random() - 0.5) * halfSize * 2;
+      const borderJitter = (Math.random() - 0.5) * thickness;
+      const bandDrift = Math.random() < 0.28 ? (Math.random() - 0.5) * 0.8 : 0;
+
+      if (edge === 0) {
+        targetPositions[offset] = -halfSize + borderJitter;
+        targetPositions[offset + 1] = t + bandDrift;
+      } else if (edge === 1) {
+        targetPositions[offset] = halfSize + borderJitter;
+        targetPositions[offset + 1] = t + bandDrift;
+      } else if (edge === 2) {
+        targetPositions[offset] = t + bandDrift;
+        targetPositions[offset + 1] = -halfSize + borderJitter;
+      } else {
+        targetPositions[offset] = t + bandDrift;
+        targetPositions[offset + 1] = halfSize + borderJitter;
+      }
     } else {
-      targetPositions[offset] = t + bandDrift;
-      targetPositions[offset + 1] = halfSize + borderJitter;
+      const fillBias = lerp(0.72, 1, Math.sqrt(Math.random()));
+      targetPositions[offset] = (Math.random() - 0.5) * halfSize * 2 * fillBias;
+      targetPositions[offset + 1] = (Math.random() - 0.5) * halfSize * 2 * fillBias;
     }
 
     targetPositions[offset + 2] = depth;
