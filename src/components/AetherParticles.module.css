@@ -106,30 +106,40 @@
   color: rgba(255, 255, 255, 0.46);
 }
 
-/* Preset chooser now splits full-rotation shapes and front-facing shapes into two sorted columns. */
-.presetColumns {
+/* Preset chooser follows the custom storytelling order defined in the component. */
+.presetGrid {
+  display: grid;
+  gap: 12px;
+}
+
+.presetSection {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+  padding-bottom: 12px;
 }
 
-.presetColumn {
-  display: grid;
-  gap: 8px;
-}
-
-.presetColumnLabel {
-  padding-left: 4px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.4);
-}
-
-.presetList {
-  display: grid;
-  gap: 10px;
+.presetSection::after {
+  content: "";
+  position: absolute;
+  right: 2px;
+  bottom: 0;
+  left: 2px;
+  height: 2px;
+  /* Reuse the luminous divider motif under every preset section for consistent grouping. */
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0),
+    rgba(96, 165, 250, 0.14) 16%,
+    rgba(255, 255, 255, 0.72) 50%,
+    rgba(96, 165, 250, 0.14) 84%,
+    rgba(255, 255, 255, 0)
+  );
+  border-radius: 999px;
+  box-shadow:
+    0 0 10px rgba(255, 255, 255, 0.16),
+    0 0 18px rgba(59, 130, 246, 0.14);
 }
 
 .presetButton {

@@ -13,16 +13,24 @@ const { Hands } = handsPackage;
 // - `rotation` decides whether the shape can tilt vertically or should stay front-facing
 const PRESETS = {
   sphere: { label: "Sphere", color: "#2563eb", icon: "\u25CF", rotation: "full" },
-  heart: { label: "Heart", color: "#dc2626", icon: "\u2665", rotation: "horizontal" },
+  heart: { label: "Heart", color: "#dc2626", icon: "\u2665", rotation: "front" },
   saturn: { label: "Saturn", color: "#caa46b", icon: "\u{1FA90}", rotation: "horizontal" },
-  buddha: { label: "Buddha", color: "#b7791f", icon: "\u2638", rotation: "horizontal" },
-  flower: { label: "Flower", color: "#e11d48", icon: "\u273F", rotation: "horizontal" },
-  lotus: { label: "Lotus", color: "#ec4899", icon: "\u{1FAB7}", rotation: "horizontal" },
-  fireworks: { label: "Fireworks", color: "#f97316", icon: "\u2726", rotation: "full" },
-  supernova: { label: "Supernova", color: "#8b5cf6", icon: "\u273A", rotation: "full" },
+  buddha: { label: "Buddha", color: "#b7791f", icon: "\u2638", rotation: "front" },
+  flower: { label: "Flower", color: "#e11d48", icon: "\u273F", rotation: "front" },
+  lotus: { label: "Lotus", color: "#ec4899", icon: "\u{1FAB7}", rotation: "front" },
+  fireworks: { label: "Fireworks", color: "#f97316", icon: "\u2726", rotation: "front" },
+  supernova: { label: "Supernova", color: "#8b5cf6", icon: "\u273A", rotation: "front" },
   cube: { label: "Cube", color: "#14b8a6", icon: "\u25A3", rotation: "full" },
-  square: { label: "Square", color: "#d97706", icon: "\u25A0", rotation: "horizontal" },
+  square: { label: "Square", color: "#d97706", icon: "\u25A0", rotation: "front" },
 };
+
+const PRESET_SECTIONS = [
+  ["heart", "buddha"],
+  ["flower", "lotus"],
+  ["cube", "square"],
+  ["sphere", "saturn"],
+  ["supernova", "fireworks"],
+];
 
 const DEFAULT_STATUS = {
   id: "boot",
@@ -53,15 +61,9 @@ export default function AetherParticles() {
   // The onboarding guide opens by default, then becomes user-controlled via the left panel.
   const [isGuideOpen, setIsGuideOpen] = useState(true);
 
-  // Sidebar layout mirrors the viewing rules:
-  // left column = fully rotatable 3D forms, right column = front-facing readable silhouettes.
-  const fullPresets = Object.entries(PRESETS)
-    .filter(([, value]) => value.rotation === "full")
-    .sort((left, right) => left[1].label.localeCompare(right[1].label));
-
-  const horizontalPresets = Object.entries(PRESETS)
-    .filter(([, value]) => value.rotation === "horizontal")
-    .sort((left, right) => left[1].label.localeCompare(right[1].label));
+  const presetSections = PRESET_SECTIONS.map((section) =>
+    section.map((key) => [key, PRESETS[key]]),
+  );
 
   useEffect(() => {
     activePresetRef.current = preset;
@@ -261,13 +263,16 @@ export default function AetherParticles() {
       }
 
       positionAttribute.needsUpdate = true;
-      // Silhouettes stay readable from the front, while volumetric objects can spin on both axes.
+      // Silhouettes stay readable from the front, horizontal models orbit sideways, volumetric objects spin freely.
       const rotationMode = PRESETS[activePresetRef.current].rotation;
-      particles.rotation.y += 0.002;
-
       if (rotationMode === "full") {
+        particles.rotation.y += 0.002;
         particles.rotation.x += 0.001;
+      } else if (rotationMode === "horizontal") {
+        particles.rotation.y += 0.002;
+        particles.rotation.x += (0 - particles.rotation.x) * 0.08;
       } else {
+        particles.rotation.y += (0 - particles.rotation.y) * 0.08;
         particles.rotation.x += (0 - particles.rotation.x) * 0.08;
       }
 
@@ -389,11 +394,10 @@ export default function AetherParticles() {
 
         <div className={styles.block}>
           <span className={styles.label}>Shape Template</span>
-          <div className={styles.presetColumns}>
-            <div className={styles.presetColumn}>
-              <span className={styles.presetColumnLabel}>Full</span>
-              <div className={styles.presetList}>
-                {fullPresets.map(([key, value]) => (
+          <div className={styles.presetGrid}>
+            {presetSections.map((section, sectionIndex) => (
+              <div key={`section-${sectionIndex}`} className={styles.presetSection}>
+                {section.map(([key, value]) => (
                   <button
                     key={key}
                     type="button"
@@ -408,27 +412,7 @@ export default function AetherParticles() {
                   </button>
                 ))}
               </div>
-            </div>
-
-            <div className={styles.presetColumn}>
-              <span className={styles.presetColumnLabel}>Horizontal</span>
-              <div className={styles.presetList}>
-                {horizontalPresets.map(([key, value]) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => handlePresetChange(key)}
-                    className={styles.presetButton}
-                    data-active={preset === key}
-                  >
-                    <span className={styles.presetIcon} aria-hidden="true">
-                      {value.icon}
-                    </span>
-                    <span className={styles.presetLabel}>{value.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
+            ))}
           </div>
         </div>
 
@@ -584,6 +568,7 @@ function buildPresetPositions(type, particleCount) {
 
 function createSpherePositions(particleCount) {
   const targetPositions = new Float32Array(particleCount * 3);
+  const radius = 5;
 
   for (let index = 0; index < particleCount; index += 1) {
     const offset = index * 3;
@@ -591,10 +576,11 @@ function createSpherePositions(particleCount) {
     const v = Math.random();
     const theta = 2 * Math.PI * u;
     const phi = Math.acos(2 * v - 1);
+    const radialDistance = Math.cbrt(Math.random()) * radius;
 
-    targetPositions[offset] = 5 * Math.sin(phi) * Math.cos(theta);
-    targetPositions[offset + 1] = 5 * Math.sin(phi) * Math.sin(theta);
-    targetPositions[offset + 2] = 5 * Math.cos(phi);
+    targetPositions[offset] = radialDistance * Math.sin(phi) * Math.cos(theta);
+    targetPositions[offset + 1] = radialDistance * Math.sin(phi) * Math.sin(theta);
+    targetPositions[offset + 2] = radialDistance * Math.cos(phi);
   }
 
   return targetPositions;
@@ -607,15 +593,19 @@ function createHeartPositions(particleCount) {
     const offset = index * 3;
     const t = Math.random() * 2 * Math.PI;
     const scale = 0.3;
+    const fillBias = lerp(0.72, 1, Math.sqrt(Math.random()));
+    const jitter = (Math.random() - 0.5) * 0.08;
 
-    targetPositions[offset] = 16 * Math.sin(t) ** 3 * scale;
+    targetPositions[offset] = 16 * Math.sin(t) ** 3 * scale * fillBias + jitter;
     targetPositions[offset + 1] =
       (13 * Math.cos(t) -
         5 * Math.cos(2 * t) -
         2 * Math.cos(3 * t) -
         Math.cos(4 * t)) *
-      scale;
-    targetPositions[offset + 2] = (Math.random() - 0.5) * 2;
+      scale *
+      fillBias +
+      jitter;
+    targetPositions[offset + 2] = (Math.random() - 0.5) * 0.8;
   }
 
   return targetPositions;
@@ -657,10 +647,11 @@ function createFlowerPositions(particleCount) {
     const offset = index * 3;
     const phi = Math.random() * Math.PI * 2;
     const radius = 2 * Math.cos(5 * phi) + 1;
+    const fill = lerp(0.35, 1, Math.sqrt(Math.random()));
 
-    targetPositions[offset] = radius * Math.cos(phi) * 2.1;
-    targetPositions[offset + 1] = radius * Math.sin(phi) * 2.1;
-    targetPositions[offset + 2] = (Math.random() - 0.5) * 2;
+    targetPositions[offset] = radius * fill * Math.cos(phi) * 2.25;
+    targetPositions[offset + 1] = radius * fill * Math.sin(phi) * 2.25;
+    targetPositions[offset + 2] = (Math.random() - 0.5) * 0.75;
   }
 
   return targetPositions;
@@ -673,12 +664,12 @@ function createLotusPositions(particleCount) {
   for (let index = 0; index < particleCount; index += 1) {
     const offset = index * 3;
     const theta = Math.random() * Math.PI * 2;
-    const radiusProgress = Math.random();
-    const radius = Math.cos(4 * theta) * radiusProgress * 2.5;
+    const radiusProgress = Math.sqrt(Math.random());
+    const radius = Math.cos(4 * theta) * radiusProgress * 2.55;
     const x = radius * Math.cos(theta);
     const z = radius * Math.sin(theta);
     const y = radiusProgress * radiusProgress * 1.5 - Math.abs(radius) * 0.3 - 0.5;
-    const [volumeX, volumeY, volumeZ] = addVolume(x, y, z, 0.05);
+    const [volumeX, volumeY, volumeZ] = addVolume(x, y, z, 0.07);
 
     targetPositions[offset] = volumeX * 2.2;
     targetPositions[offset + 1] = volumeY * 2.2;
@@ -707,12 +698,16 @@ function createFireworksPositions(particleCount) {
 
   for (let index = 0; index < particleCount; index += 1) {
     const offset = index * 3;
-    const angle = Math.random() * Math.PI * 2;
-    const distance = Math.random() * 8;
+    const burstCount = 10;
+    const burstAngle = (Math.floor(Math.random() * burstCount) / burstCount) * Math.PI * 2;
+    const angle = burstAngle + (Math.random() - 0.5) * 0.26;
+    const distance = lerp(1.1, 7.9, Math.sqrt(Math.random()));
+    const spread = 0.22 + distance * 0.035;
 
-    targetPositions[offset] = Math.cos(angle) * distance;
-    targetPositions[offset + 1] = Math.sin(angle) * distance;
-    targetPositions[offset + 2] = (Math.random() - 0.5) * distance;
+    targetPositions[offset] = Math.cos(angle) * distance + (Math.random() - 0.5) * spread;
+    targetPositions[offset + 1] =
+      Math.sin(angle) * distance + (Math.random() - 0.5) * spread;
+    targetPositions[offset + 2] = (Math.random() - 0.5) * 0.7;
   }
 
   return targetPositions;
@@ -720,16 +715,24 @@ function createFireworksPositions(particleCount) {
 
 function createSupernovaPositions(particleCount) {
   const targetPositions = new Float32Array(particleCount * 3);
+  const armCount = 14;
 
   for (let index = 0; index < particleCount; index += 1) {
     const offset = index * 3;
-    const radius = Math.random() * 3;
-    const theta = Math.random() * Math.PI * 2;
-    const phi = Math.random() * Math.PI;
+    const armAngle = (Math.floor(Math.random() * armCount) / armCount) * Math.PI * 2;
+    const angle = armAngle + (Math.random() - 0.5) * 0.22;
+    const radius = lerp(0.25, 6.2, Math.pow(Math.random(), 0.52));
+    const flare = radius * radius * 0.015;
 
-    targetPositions[offset] = radius * Math.sin(phi) * Math.cos(theta) * 2;
-    targetPositions[offset + 1] = radius * Math.sin(phi) * Math.sin(theta) * 2;
-    targetPositions[offset + 2] = radius * Math.cos(phi) * 2;
+    targetPositions[offset] = Math.cos(angle) * radius + (Math.random() - 0.5) * flare;
+    targetPositions[offset + 1] = Math.sin(angle) * radius + (Math.random() - 0.5) * flare;
+    targetPositions[offset + 2] = (Math.random() - 0.5) * 0.55;
+
+    if (index < particleCount * 0.16) {
+      targetPositions[offset] *= 0.38;
+      targetPositions[offset + 1] *= 0.38;
+      targetPositions[offset + 2] *= 0.3;
+    }
   }
 
   return targetPositions;
@@ -767,26 +770,29 @@ function createCubePositions(particleCount) {
 // Square is intentionally tighter than the previous version so it reads as less zoomed-out on screen.
 function createSquarePositions(particleCount) {
   const targetPositions = new Float32Array(particleCount * 3);
-  const halfSize = 3.8;
+  const halfSize = 2.95;
+  const thickness = 0.16;
 
   for (let index = 0; index < particleCount; index += 1) {
     const offset = index * 3;
     const edge = index % 4;
     const t = (Math.random() - 0.5) * halfSize * 2;
-    const depth = (Math.random() - 0.5) * 0.35;
+    const depth = (Math.random() - 0.5) * 0.16;
+    const borderJitter = (Math.random() - 0.5) * thickness;
+    const bandDrift = Math.random() < 0.2 ? (Math.random() - 0.5) * 0.5 : 0;
 
     if (edge === 0) {
-      targetPositions[offset] = -halfSize;
-      targetPositions[offset + 1] = t;
+      targetPositions[offset] = -halfSize + borderJitter;
+      targetPositions[offset + 1] = t + bandDrift;
     } else if (edge === 1) {
-      targetPositions[offset] = halfSize;
-      targetPositions[offset + 1] = t;
+      targetPositions[offset] = halfSize + borderJitter;
+      targetPositions[offset + 1] = t + bandDrift;
     } else if (edge === 2) {
-      targetPositions[offset] = t;
-      targetPositions[offset + 1] = -halfSize;
+      targetPositions[offset] = t + bandDrift;
+      targetPositions[offset + 1] = -halfSize + borderJitter;
     } else {
-      targetPositions[offset] = t;
-      targetPositions[offset + 1] = halfSize;
+      targetPositions[offset] = t + bandDrift;
+      targetPositions[offset + 1] = halfSize + borderJitter;
     }
 
     targetPositions[offset + 2] = depth;
