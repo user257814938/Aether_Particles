@@ -32,6 +32,33 @@
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
 }
 
+.panelHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.helpButton {
+  flex-shrink: 0;
+  padding: 9px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.helpButton:hover {
+  transform: translateY(-2px);
+  border-color: rgba(96, 165, 250, 0.78);
+  background: rgba(59, 130, 246, 0.16);
+}
+
 .kicker {
   margin: 0 0 4px;
   font-size: 11px;
@@ -79,13 +106,46 @@
   color: rgba(255, 255, 255, 0.46);
 }
 
-.grid {
+/* Preset chooser follows the custom storytelling order defined in the component. */
+.presetGrid {
+  display: grid;
+  gap: 12px;
+}
+
+.presetSection {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+  padding-bottom: 12px;
+}
+
+.presetSection::after {
+  content: "";
+  position: absolute;
+  right: 2px;
+  bottom: 0;
+  left: 2px;
+  height: 2px;
+  /* Reuse the luminous divider motif under every preset section for consistent grouping. */
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0),
+    rgba(96, 165, 250, 0.14) 16%,
+    rgba(255, 255, 255, 0.72) 50%,
+    rgba(96, 165, 250, 0.14) 84%,
+    rgba(255, 255, 255, 0)
+  );
+  border-radius: 999px;
+  box-shadow:
+    0 0 10px rgba(255, 255, 255, 0.16),
+    0 0 18px rgba(59, 130, 246, 0.14);
 }
 
 .presetButton {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   padding: 12px 10px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 14px;
@@ -96,6 +156,7 @@
     transform 160ms ease,
     border-color 160ms ease,
     background 160ms ease;
+  text-align: left;
 }
 
 .presetButton:hover {
@@ -107,6 +168,21 @@
 .presetButton[data-active="true"] {
   border-color: rgba(96, 165, 250, 0.84);
   background: rgba(59, 130, 246, 0.22);
+}
+
+.presetIcon {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  font-size: 15px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.presetLabel {
+  min-width: 0;
 }
 
 .colorInput {
@@ -142,19 +218,263 @@
   display: none;
 }
 
-.previewVideo {
+/* Dock anchored bottom-left for the moved camera preview and live force gauge. */
+.bottomDock {
   position: fixed;
-  right: 24px;
+  left: 24px;
   bottom: 24px;
   z-index: 2;
-  width: 180px;
-  height: 132px;
+  display: grid;
+  gap: 14px;
+  width: min(320px, calc(100vw - 32px));
+}
+
+.forceCard,
+.cameraCard {
+  padding: 16px;
+  border-radius: 20px;
+  background: rgba(15, 15, 15, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
+}
+
+.forceHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.forceTitle,
+.cameraLabel {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.46);
+}
+
+.forceValue {
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.forceMeter {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.forceIcon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 18px;
+}
+
+.forceTrack {
+  position: relative;
+  height: 14px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.forceFill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #334155 0%, #3b82f6 50%, #7dd3fc 100%);
+  box-shadow: 0 0 22px rgba(59, 130, 246, 0.45);
+}
+
+.forceThumb {
+  position: absolute;
+  top: 50%;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid rgba(59, 130, 246, 0.85);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.28);
+  transform: translate(-50%, -50%);
+}
+
+.cameraLabel {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.previewVideo {
+  position: static;
+  width: 100%;
+  aspect-ratio: 4 / 3;
   object-fit: cover;
   transform: scaleX(-1);
   border-radius: 16px;
   border: 2px solid rgba(59, 130, 246, 0.85);
   background: rgba(255, 255, 255, 0.04);
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
+}
+
+/* First-run onboarding overlay that can be reopened from the left panel help button. */
+.guideOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(6px);
+  transition:
+    opacity 180ms ease,
+    visibility 180ms ease;
+}
+
+.guideOverlayVisible {
+  opacity: 1;
+  visibility: visible;
+}
+
+.guideOverlayHidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.guideCard {
+  width: min(720px, 100%);
+  padding: 28px;
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at top right, rgba(59, 130, 246, 0.18), transparent 24%),
+    rgba(12, 16, 28, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 28px 100px rgba(0, 0, 0, 0.46);
+  animation: guideFadeIn 220ms ease;
+}
+
+.guideEyebrow {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(125, 211, 252, 0.92);
+}
+
+.guideTitle {
+  margin: 0;
+  font-size: clamp(1.7rem, 4vw, 2.3rem);
+  line-height: 1.02;
+  color: #ffffff;
+}
+
+.guideText {
+  margin: 14px 0 0;
+  color: rgba(255, 255, 255, 0.76);
+  line-height: 1.6;
+}
+
+.guideSteps {
+  display: grid;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.guideStep {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 14px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.guideStepNumber {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #60a5fa, #7dd3fc);
+  color: #031220;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.guideStepTitle {
+  display: block;
+  color: #ffffff;
+}
+
+.guideStepText {
+  margin: 6px 0 0;
+  color: rgba(255, 255, 255, 0.74);
+  line-height: 1.55;
+}
+
+.guideLegend {
+  display: grid;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.guideLegendItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.guideLegendIcon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.guideActions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+
+.guideCloseButton {
+  padding: 12px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #3b82f6, #7dd3fc);
+  color: #031220;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+@keyframes guideFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 @media (max-width: 768px) {
@@ -166,10 +486,19 @@
     padding: 18px;
   }
 
-  .previewVideo {
+  .bottomDock {
+    left: 16px;
     right: 16px;
     bottom: 16px;
-    width: 128px;
-    height: 96px;
+    width: auto;
+  }
+
+  .guideOverlay {
+    padding: 16px;
+  }
+
+  .guideCard {
+    padding: 20px;
+    border-radius: 24px;
   }
 }

@@ -7,14 +7,30 @@ import styles from "./AetherParticles.module.css";
 
 const { Hands } = handsPackage;
 
+// Central preset registry:
+// - `color` defines the auto-selected default tint for each model
+// - `icon` supports faster visual recognition in the sidebar
+// - `rotation` decides whether the shape can tilt vertically or should stay front-facing
 const PRESETS = {
-  sphere: { label: "Sphere", color: "#3b82f6" },
-  heart: { label: "Heart", color: "#ec4899" },
-  saturn: { label: "Saturn", color: "#fbbf24" },
-  buddha: { label: "Buddha", color: "#f97316" },
-  flower: { label: "Flower", color: "#22c55e" },
-  fireworks: { label: "Fireworks", color: "#ef4444" },
+  sphere: { label: "Sphere", color: "#2563eb", icon: "\u25CF", rotation: "full" },
+  heart: { label: "Heart", color: "#dc2626", icon: "\u2665", rotation: "front" },
+  saturn: { label: "Saturn", color: "#caa46b", icon: "\u{1FA90}", rotation: "horizontal" },
+  buddha: { label: "Buddha", color: "#b7791f", icon: "\u2638", rotation: "front" },
+  flower: { label: "Flower", color: "#e11d48", icon: "\u273F", rotation: "front" },
+  lotus: { label: "Lotus", color: "#ec4899", icon: "\u{1FAB7}", rotation: "front" },
+  fireworks: { label: "Fireworks", color: "#f97316", icon: "\u2726", rotation: "front" },
+  supernova: { label: "Supernova", color: "#8b5cf6", icon: "\u273A", rotation: "front" },
+  cube: { label: "Cube", color: "#14b8a6", icon: "\u25A3", rotation: "full" },
+  square: { label: "Square", color: "#d97706", icon: "\u25A0", rotation: "front" },
 };
+
+const PRESET_SECTIONS = [
+  ["heart", "buddha"],
+  ["flower", "lotus"],
+  ["cube", "square"],
+  ["sphere", "saturn"],
+  ["supernova", "fireworks"],
+];
 
 const DEFAULT_STATUS = {
   id: "boot",
@@ -27,12 +43,6 @@ export default function AetherParticles() {
   const hiddenVideoRef = useRef(null);
   const previewVideoRef = useRef(null);
   const animationFrameRef = useRef(0);
-  const sceneRef = useRef(null);
-  const cameraRef = useRef(null);
-  const rendererRef = useRef(null);
-  const geometryRef = useRef(null);
-  const materialRef = useRef(null);
-  const particlesRef = useRef(null);
   const targetPositionsRef = useRef(new Float32Array());
   const handsRef = useRef(null);
   const mediaStreamRef = useRef(null);
@@ -47,6 +57,13 @@ export default function AetherParticles() {
   const [preset, setPreset] = useState("sphere");
   const [particleColor, setParticleColor] = useState(PRESETS.sphere.color);
   const [status, setStatus] = useState(DEFAULT_STATUS);
+  const [forceLevel, setForceLevel] = useState(0);
+  // The onboarding guide opens by default, then becomes user-controlled via the left panel.
+  const [isGuideOpen, setIsGuideOpen] = useState(true);
+
+  const presetSections = PRESET_SECTIONS.map((section) =>
+    section.map((key) => [key, PRESETS[key]]),
+  );
 
   useEffect(() => {
     activePresetRef.current = preset;
@@ -57,10 +74,20 @@ export default function AetherParticles() {
 
   useEffect(() => {
     colorTargetRef.current.set(particleColor);
-    if (materialRef.current) {
-      materialRef.current.color.set(particleColor);
-    }
   }, [particleColor]);
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setIsGuideOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -77,15 +104,12 @@ export default function AetherParticles() {
 
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    rendererRef.current = renderer;
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x000000);
-    sceneRef.current = scene;
 
     const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
     camera.position.z = 15;
-    cameraRef.current = camera;
 
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(particleCount * 3);
@@ -95,7 +119,6 @@ export default function AetherParticles() {
     }
 
     geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    geometryRef.current = geometry;
 
     const material = new THREE.PointsMaterial({
       size: 0.05,
@@ -105,11 +128,9 @@ export default function AetherParticles() {
       depthWrite: false,
       blending: THREE.AdditiveBlending,
     });
-    materialRef.current = material;
 
     const particles = new THREE.Points(geometry, material);
     scene.add(particles);
-    particlesRef.current = particles;
 
     targetPositionsRef.current = buildPresetPositions(activePresetRef.current, particleCount);
 
@@ -121,6 +142,36 @@ export default function AetherParticles() {
       setStatus((previousStatus) =>
         previousStatus.id === nextStatus.id ? previousStatus : nextStatus,
       );
+    };
+
+    const updateForceLevel = (nextForceLevel) => {
+      if (!mountedRef.current) {
+        return;
+      }
+
+      const clampedForce = THREE.MathUtils.clamp(nextForceLevel, 0, 1);
+      setForceLevel((previousForceLevel) =>
+        Math.abs(previousForceLevel - clampedForce) < 0.015
+          ? previousForceLevel
+          : clampedForce,
+      );
+    };
+
+    const syncPreviewStream = () => {
+      if (!previewVideoRef.current || !hiddenVideoRef.current?.srcObject) {
+        return;
+      }
+
+      previewVideoRef.current.srcObject = hiddenVideoRef.current.srcObject;
+      previewVideoRef.current.play().catch(() => {});
+    };
+
+    const resize = () => {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      renderer.setSize(width, height, false);
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
     };
 
     const handleResults = (results) => {
@@ -136,11 +187,19 @@ export default function AetherParticles() {
         });
 
         const averageTension = totalTension / handLandmarks.length;
+        // Gesture openness powers both the particle expansion and the force gauge in the dock.
+        const opennessForce = THREE.MathUtils.clamp(
+          THREE.MathUtils.mapLinear(averageTension, 0.1, 0.5, 0, 1),
+          0,
+          1,
+        );
+
         targetExpansionRef.current = THREE.MathUtils.clamp(
           THREE.MathUtils.mapLinear(averageTension, 0.1, 0.5, 0.2, 2.5),
           0.2,
           2.5,
         );
+        updateForceLevel(opennessForce);
 
         updateStatus({
           id: "tracking",
@@ -151,30 +210,12 @@ export default function AetherParticles() {
       }
 
       targetExpansionRef.current = 0.8;
+      updateForceLevel(0);
       updateStatus({
         id: "idle",
         tone: "neutral",
         text: "Camera active. Place ta main dans le cadre pour reprendre le controle.",
       });
-    };
-
-    const syncPreviewStream = () => {
-      if (!previewVideoRef.current || !hiddenVideoRef.current?.srcObject) {
-        return;
-      }
-
-      previewVideoRef.current.srcObject = hiddenVideoRef.current.srcObject;
-      previewVideoRef.current
-        .play()
-        .catch(() => {});
-    };
-
-    const resize = () => {
-      const width = window.innerWidth;
-      const height = window.innerHeight;
-      renderer.setSize(width, height, false);
-      camera.aspect = width / height;
-      camera.updateProjectionMatrix();
     };
 
     const renderFrame = () => {
@@ -222,8 +263,19 @@ export default function AetherParticles() {
       }
 
       positionAttribute.needsUpdate = true;
-      particles.rotation.y += 0.002;
-      particles.rotation.x += 0.001;
+      // Silhouettes stay readable from the front, horizontal models orbit sideways, volumetric objects spin freely.
+      const rotationMode = PRESETS[activePresetRef.current].rotation;
+      if (rotationMode === "full") {
+        particles.rotation.y += 0.002;
+        particles.rotation.x += 0.001;
+      } else if (rotationMode === "horizontal") {
+        particles.rotation.y += 0.002;
+        particles.rotation.x += (0 - particles.rotation.x) * 0.08;
+      } else {
+        particles.rotation.y += (0 - particles.rotation.y) * 0.08;
+        particles.rotation.x += (0 - particles.rotation.x) * 0.08;
+      }
+
       renderer.render(scene, camera);
     };
 
@@ -266,8 +318,10 @@ export default function AetherParticles() {
           tone: "ready",
           text: "Camera connectee. Ouvre la main pour disperser les particules.",
         });
+        updateForceLevel(0);
       } catch (error) {
         console.error(error);
+        updateForceLevel(0);
         updateStatus({
           id: "camera-error",
           tone: "error",
@@ -312,30 +366,52 @@ export default function AetherParticles() {
     setParticleColor(PRESETS[nextPreset].color);
   };
 
+  const forcePercent = Math.round(forceLevel * 100);
+
   return (
     <main className={styles.page}>
       <canvas ref={canvasRef} className={styles.canvas} />
 
       <section className={styles.panel}>
-        <p className={styles.kicker}>Hand Gesture Lab</p>
-        <h1 className={styles.title}>Aether Particles</h1>
+        <div className={styles.panelHeader}>
+          <div>
+            <p className={styles.kicker}>Hand Gesture Lab</p>
+            <h1 className={styles.title}>Aether Particles</h1>
+          </div>
+
+          <button
+            type="button"
+            className={styles.helpButton}
+            onClick={() => setIsGuideOpen(true)}
+          >
+            Aide ?
+          </button>
+        </div>
+
         <p className={styles.status} data-tone={status.tone}>
           {status.text}
         </p>
 
         <div className={styles.block}>
           <span className={styles.label}>Shape Template</span>
-          <div className={styles.grid}>
-            {Object.entries(PRESETS).map(([key, value]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => handlePresetChange(key)}
-                className={styles.presetButton}
-                data-active={preset === key}
-              >
-                {value.label}
-              </button>
+          <div className={styles.presetGrid}>
+            {presetSections.map((section, sectionIndex) => (
+              <div key={`section-${sectionIndex}`} className={styles.presetSection}>
+                {section.map(([key, value]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => handlePresetChange(key)}
+                    className={styles.presetButton}
+                    data-active={preset === key}
+                  >
+                    <span className={styles.presetIcon} aria-hidden="true">
+                      {value.icon}
+                    </span>
+                    <span className={styles.presetLabel}>{value.label}</span>
+                  </button>
+                ))}
+              </div>
             ))}
           </div>
         </div>
@@ -363,104 +439,428 @@ export default function AetherParticles() {
         </div>
       </section>
 
+      {/* Bottom-left utility dock: live force feedback + camera placement preview. */}
+      <div className={styles.bottomDock}>
+        <section className={styles.forceCard}>
+          <div className={styles.forceHeader}>
+            <span className={styles.forceTitle}>Force</span>
+            <span className={styles.forceValue}>{forcePercent}%</span>
+          </div>
+
+          <div className={styles.forceMeter}>
+            <span className={styles.forceIcon} aria-hidden="true">
+              {"\u270A"}
+            </span>
+
+            <div className={styles.forceTrack} aria-label="Jauge de force d'ouverture de la main">
+              <div className={styles.forceFill} style={{ width: `${forcePercent}%` }} />
+              <div className={styles.forceThumb} style={{ left: `${forcePercent}%` }} />
+            </div>
+
+            <span className={styles.forceIcon} aria-hidden="true">
+              {"\u270B"}
+            </span>
+          </div>
+        </section>
+
+        <section className={styles.cameraCard}>
+          <p className={styles.cameraLabel}>Camera</p>
+          <video ref={previewVideoRef} className={styles.previewVideo} autoPlay playsInline muted />
+        </section>
+      </div>
+
       <video ref={hiddenVideoRef} className={styles.hiddenVideo} playsInline muted />
-      <video
-        ref={previewVideoRef}
-        className={styles.previewVideo}
-        autoPlay
-        playsInline
-        muted
-      />
+
+      {/* Welcome guide shown on first load and reopened later through the "Aide ?" button. */}
+      <div
+        className={`${styles.guideOverlay} ${
+          isGuideOpen ? styles.guideOverlayVisible : styles.guideOverlayHidden
+        }`}
+        aria-hidden={!isGuideOpen}
+      >
+        <section className={styles.guideCard} role="dialog" aria-modal="true" aria-label="Guide d'accueil">
+          <p className={styles.guideEyebrow}>Guide d'accueil</p>
+          <h2 className={styles.guideTitle}>Comment utiliser le systeme</h2>
+          <p className={styles.guideText}>
+            La camera transforme l'ouverture de ta main en force. Main fermee: la jauge
+            retombe. Main ouverte: la jauge monte et la sculpture se deploie.
+          </p>
+
+          <div className={styles.guideSteps}>
+            <div className={styles.guideStep}>
+              <span className={styles.guideStepNumber}>1</span>
+              <div>
+                <strong className={styles.guideStepTitle}>Autorise la camera</strong>
+                <p className={styles.guideStepText}>
+                  Reste visible dans l'aperçu en bas a gauche pour que le suivi reste stable.
+                </p>
+              </div>
+            </div>
+
+            <div className={styles.guideStep}>
+              <span className={styles.guideStepNumber}>2</span>
+              <div>
+                <strong className={styles.guideStepTitle}>Observe la jauge</strong>
+                <p className={styles.guideStepText}>
+                  Elle passe de 0% a 100% selon l'ouverture de la main, entre le poing ferme et la main ouverte.
+                </p>
+              </div>
+            </div>
+
+            <div className={styles.guideStep}>
+              <span className={styles.guideStepNumber}>3</span>
+              <div>
+                <strong className={styles.guideStepTitle}>Teste les modeles</strong>
+                <p className={styles.guideStepText}>
+                  Utilise les presets et la couleur du panneau gauche pour changer le rendu.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className={styles.guideLegend}>
+            <div className={styles.guideLegendItem}>
+              <span className={styles.guideLegendIcon}>{"\u270A"}</span>
+              <span>Poing ferme: force basse, particules contractees.</span>
+            </div>
+            <div className={styles.guideLegendItem}>
+              <span className={styles.guideLegendIcon}>{"\u270B"}</span>
+              <span>Main ouverte: force haute, particules ouvertes.</span>
+            </div>
+          </div>
+
+          <div className={styles.guideActions}>
+            <button type="button" className={styles.guideCloseButton} onClick={() => setIsGuideOpen(false)}>
+              Commencer
+            </button>
+          </div>
+        </section>
+      </div>
     </main>
   );
 }
 
 function buildPresetPositions(type, particleCount) {
+  switch (type) {
+    case "heart":
+      return createHeartPositions(particleCount);
+    case "saturn":
+      return createSaturnPositions(particleCount);
+    case "buddha":
+      return createBuddhaPositions(particleCount);
+    case "flower":
+      return createFlowerPositions(particleCount);
+    case "lotus":
+      return createLotusPositions(particleCount);
+    case "fireworks":
+      return createFireworksPositions(particleCount);
+    case "supernova":
+      return createSupernovaPositions(particleCount);
+    case "cube":
+      return createCubePositions(particleCount);
+    case "square":
+      return createSquarePositions(particleCount);
+    case "sphere":
+    default:
+      return createSpherePositions(particleCount);
+  }
+}
+
+function createSpherePositions(particleCount) {
+  const targetPositions = new Float32Array(particleCount * 3);
+  const radius = 5;
+
+  for (let index = 0; index < particleCount; index += 1) {
+    const offset = index * 3;
+    const u = Math.random();
+    const v = Math.random();
+    const theta = 2 * Math.PI * u;
+    const phi = Math.acos(2 * v - 1);
+    const radialDistance = Math.cbrt(Math.random()) * radius;
+
+    targetPositions[offset] = radialDistance * Math.sin(phi) * Math.cos(theta);
+    targetPositions[offset + 1] = radialDistance * Math.sin(phi) * Math.sin(theta);
+    targetPositions[offset + 2] = radialDistance * Math.cos(phi);
+  }
+
+  return targetPositions;
+}
+
+function createHeartPositions(particleCount) {
   const targetPositions = new Float32Array(particleCount * 3);
 
   for (let index = 0; index < particleCount; index += 1) {
     const offset = index * 3;
-    let x = 0;
-    let y = 0;
-    let z = 0;
+    const t = Math.random() * 2 * Math.PI;
+    const scale = 0.3;
+    const fillBias = lerp(0.72, 1, Math.sqrt(Math.random()));
+    const jitter = (Math.random() - 0.5) * 0.08;
 
-    switch (type) {
-      case "sphere": {
-        const u = Math.random();
-        const v = Math.random();
-        const theta = 2 * Math.PI * u;
-        const phi = Math.acos(2 * v - 1);
-        x = 5 * Math.sin(phi) * Math.cos(theta);
-        y = 5 * Math.sin(phi) * Math.sin(theta);
-        z = 5 * Math.cos(phi);
-        break;
-      }
-      case "heart": {
-        const t = Math.random() * 2 * Math.PI;
-        const scale = 0.3;
-        x = 16 * Math.sin(t) ** 3 * scale;
-        y =
-          (13 * Math.cos(t) -
-            5 * Math.cos(2 * t) -
-            2 * Math.cos(3 * t) -
-            Math.cos(4 * t)) *
-          scale;
-        z = (Math.random() - 0.5) * 2;
-        break;
-      }
-      case "saturn": {
-        if (index < particleCount * 0.4) {
-          const u = Math.random();
-          const v = Math.random();
-          const theta = 2 * Math.PI * u;
-          const phi = Math.acos(2 * v - 1);
-          x = 3.5 * Math.sin(phi) * Math.cos(theta);
-          y = 3.5 * Math.sin(phi) * Math.sin(theta);
-          z = 3.5 * Math.cos(phi);
-        } else {
-          const distance = 5 + Math.random() * 3;
-          const angle = Math.random() * Math.PI * 2;
-          x = Math.cos(angle) * distance;
-          z = Math.sin(angle) * distance;
-          y = (Math.random() - 0.5) * 0.4;
-        }
-        break;
-      }
-      case "buddha": {
-        const angle = Math.random() * Math.PI * 2;
-        const height = (Math.random() - 0.5) * 8;
-        const radius =
-          height < -2 ? 4 : height < 1 ? 2.5 : height < 3 ? 1.5 : 1;
-        x = Math.cos(angle) * radius * Math.random();
-        y = height;
-        z = Math.sin(angle) * radius * Math.random();
-        break;
-      }
-      case "flower": {
-        const angle = Math.random() * Math.PI * 2;
-        const petals = 5;
-        const radius = 5 * Math.cos(petals * angle);
-        x = Math.cos(angle) * radius * Math.random();
-        y = Math.sin(angle) * radius * Math.random();
-        z = (Math.random() - 0.5) * 2;
-        break;
-      }
-      case "fireworks": {
-        const angle = Math.random() * Math.PI * 2;
-        const distance = Math.random() * 8;
-        x = Math.cos(angle) * distance;
-        y = Math.sin(angle) * distance;
-        z = (Math.random() - 0.5) * distance;
-        break;
-      }
-      default:
-        break;
-    }
-
-    targetPositions[offset] = x;
-    targetPositions[offset + 1] = y;
-    targetPositions[offset + 2] = z;
+    targetPositions[offset] = 16 * Math.sin(t) ** 3 * scale * fillBias + jitter;
+    targetPositions[offset + 1] =
+      (13 * Math.cos(t) -
+        5 * Math.cos(2 * t) -
+        2 * Math.cos(3 * t) -
+        Math.cos(4 * t)) *
+      scale *
+      fillBias +
+      jitter;
+    targetPositions[offset + 2] = (Math.random() - 0.5) * 0.8;
   }
 
   return targetPositions;
+}
+
+function createSaturnPositions(particleCount) {
+  const targetPositions = new Float32Array(particleCount * 3);
+
+  for (let index = 0; index < particleCount; index += 1) {
+    const offset = index * 3;
+
+    if (index < particleCount * 0.4) {
+      const u = Math.random();
+      const v = Math.random();
+      const theta = 2 * Math.PI * u;
+      const phi = Math.acos(2 * v - 1);
+
+      targetPositions[offset] = 3.5 * Math.sin(phi) * Math.cos(theta);
+      targetPositions[offset + 1] = 3.5 * Math.sin(phi) * Math.sin(theta);
+      targetPositions[offset + 2] = 3.5 * Math.cos(phi);
+      continue;
+    }
+
+    const distance = 5 + Math.random() * 3;
+    const angle = Math.random() * Math.PI * 2;
+    targetPositions[offset] = Math.cos(angle) * distance;
+    targetPositions[offset + 1] = (Math.random() - 0.5) * 0.4;
+    targetPositions[offset + 2] = Math.sin(angle) * distance;
+  }
+
+  return targetPositions;
+}
+
+// Front-facing polar flower based on a rose curve for a clean face-on silhouette.
+function createFlowerPositions(particleCount) {
+  const targetPositions = new Float32Array(particleCount * 3);
+
+  for (let index = 0; index < particleCount; index += 1) {
+    const offset = index * 3;
+    const phi = Math.random() * Math.PI * 2;
+    const radius = 2 * Math.cos(5 * phi) + 1;
+    const fill = lerp(0.35, 1, Math.sqrt(Math.random()));
+
+    targetPositions[offset] = radius * fill * Math.cos(phi) * 2.25;
+    targetPositions[offset + 1] = radius * fill * Math.sin(phi) * 2.25;
+    targetPositions[offset + 2] = (Math.random() - 0.5) * 0.75;
+  }
+
+  return targetPositions;
+}
+
+// Lotus uses layered petals plus a bowl-like vertical curve to keep the flower readable from the front.
+function createLotusPositions(particleCount) {
+  const targetPositions = new Float32Array(particleCount * 3);
+
+  for (let index = 0; index < particleCount; index += 1) {
+    const offset = index * 3;
+    const theta = Math.random() * Math.PI * 2;
+    const radiusProgress = Math.sqrt(Math.random());
+    const radius = Math.cos(4 * theta) * radiusProgress * 2.55;
+    const x = radius * Math.cos(theta);
+    const z = radius * Math.sin(theta);
+    const y = radiusProgress * radiusProgress * 1.5 - Math.abs(radius) * 0.3 - 0.5;
+    const [volumeX, volumeY, volumeZ] = addVolume(x, y, z, 0.07);
+
+    targetPositions[offset] = volumeX * 2.2;
+    targetPositions[offset + 1] = volumeY * 2.2;
+    targetPositions[offset + 2] = volumeZ * 2.2;
+  }
+
+  return targetPositions;
+}
+
+// Buddha is sampled from a 2D silhouette mask, then extruded slightly in depth to preserve the figure.
+function createBuddhaPositions(particleCount) {
+  return sampleMaskShape(
+    particleCount,
+    [-1.25, 1.25],
+    [-1.32, 1.36],
+    (x, y) => buddhaMask(x, y),
+    (x, y) => {
+      const centered = 1 - Math.min(1, Math.abs(x) * 0.8 + Math.abs(y) * 0.18);
+      return (Math.random() - 0.5) * 0.16 + centered * 0.26;
+    },
+  );
+}
+
+function createFireworksPositions(particleCount) {
+  const targetPositions = new Float32Array(particleCount * 3);
+
+  for (let index = 0; index < particleCount; index += 1) {
+    const offset = index * 3;
+    const burstCount = 10;
+    const burstAngle = (Math.floor(Math.random() * burstCount) / burstCount) * Math.PI * 2;
+    const angle = burstAngle + (Math.random() - 0.5) * 0.26;
+    const distance = lerp(1.1, 7.9, Math.sqrt(Math.random()));
+    const spread = 0.22 + distance * 0.035;
+
+    targetPositions[offset] = Math.cos(angle) * distance + (Math.random() - 0.5) * spread;
+    targetPositions[offset + 1] =
+      Math.sin(angle) * distance + (Math.random() - 0.5) * spread;
+    targetPositions[offset + 2] = (Math.random() - 0.5) * 0.7;
+  }
+
+  return targetPositions;
+}
+
+function createSupernovaPositions(particleCount) {
+  const targetPositions = new Float32Array(particleCount * 3);
+  const armCount = 14;
+
+  for (let index = 0; index < particleCount; index += 1) {
+    const offset = index * 3;
+    const armAngle = (Math.floor(Math.random() * armCount) / armCount) * Math.PI * 2;
+    const angle = armAngle + (Math.random() - 0.5) * 0.22;
+    const radius = lerp(0.25, 6.2, Math.pow(Math.random(), 0.52));
+    const flare = radius * radius * 0.015;
+
+    targetPositions[offset] = Math.cos(angle) * radius + (Math.random() - 0.5) * flare;
+    targetPositions[offset + 1] = Math.sin(angle) * radius + (Math.random() - 0.5) * flare;
+    targetPositions[offset + 2] = (Math.random() - 0.5) * 0.55;
+
+    if (index < particleCount * 0.16) {
+      targetPositions[offset] *= 0.38;
+      targetPositions[offset + 1] *= 0.38;
+      targetPositions[offset + 2] *= 0.3;
+    }
+  }
+
+  return targetPositions;
+}
+
+function createCubePositions(particleCount) {
+  const targetPositions = new Float32Array(particleCount * 3);
+  const halfSize = 4.2;
+
+  for (let index = 0; index < particleCount; index += 1) {
+    const offset = index * 3;
+    const face = Math.floor(Math.random() * 6);
+    const sign = face % 2 === 0 ? -halfSize : halfSize;
+    const u = (Math.random() - 0.5) * halfSize * 2;
+    const v = (Math.random() - 0.5) * halfSize * 2;
+
+    if (face < 2) {
+      targetPositions[offset] = sign;
+      targetPositions[offset + 1] = u;
+      targetPositions[offset + 2] = v;
+    } else if (face < 4) {
+      targetPositions[offset] = u;
+      targetPositions[offset + 1] = sign;
+      targetPositions[offset + 2] = v;
+    } else {
+      targetPositions[offset] = u;
+      targetPositions[offset + 1] = v;
+      targetPositions[offset + 2] = sign;
+    }
+  }
+
+  return targetPositions;
+}
+
+// Square is intentionally tighter than the previous version so it reads as less zoomed-out on screen.
+function createSquarePositions(particleCount) {
+  const targetPositions = new Float32Array(particleCount * 3);
+  const halfSize = 2.95;
+  const thickness = 0.16;
+
+  for (let index = 0; index < particleCount; index += 1) {
+    const offset = index * 3;
+    const edge = index % 4;
+    const t = (Math.random() - 0.5) * halfSize * 2;
+    const depth = (Math.random() - 0.5) * 0.16;
+    const borderJitter = (Math.random() - 0.5) * thickness;
+    const bandDrift = Math.random() < 0.2 ? (Math.random() - 0.5) * 0.5 : 0;
+
+    if (edge === 0) {
+      targetPositions[offset] = -halfSize + borderJitter;
+      targetPositions[offset + 1] = t + bandDrift;
+    } else if (edge === 1) {
+      targetPositions[offset] = halfSize + borderJitter;
+      targetPositions[offset + 1] = t + bandDrift;
+    } else if (edge === 2) {
+      targetPositions[offset] = t + bandDrift;
+      targetPositions[offset + 1] = -halfSize + borderJitter;
+    } else {
+      targetPositions[offset] = t + bandDrift;
+      targetPositions[offset + 1] = halfSize + borderJitter;
+    }
+
+    targetPositions[offset + 2] = depth;
+  }
+
+  return targetPositions;
+}
+
+function sampleMaskShape(particleCount, xRange, yRange, maskFn, zFn) {
+  const targetPositions = new Float32Array(particleCount * 3);
+  let accepted = 0;
+  let attempts = 0;
+
+  while (accepted < particleCount && attempts < particleCount * 40) {
+    attempts += 1;
+    const x = lerp(xRange[0], xRange[1], Math.random());
+    const y = lerp(yRange[0], yRange[1], Math.random());
+
+    if (!maskFn(x, y)) {
+      continue;
+    }
+
+    const offset = accepted * 3;
+    targetPositions[offset] = x * 4.3;
+    targetPositions[offset + 1] = y * 4.3;
+    targetPositions[offset + 2] = zFn(x, y) * 4.3;
+    accepted += 1;
+  }
+
+  while (accepted < particleCount) {
+    const offset = accepted * 3;
+    targetPositions[offset] = 0;
+    targetPositions[offset + 1] = 0;
+    targetPositions[offset + 2] = 0;
+    accepted += 1;
+  }
+
+  return targetPositions;
+}
+
+function buddhaMask(x, y) {
+  const inCircle = (cx, cy, radius) => (x - cx) ** 2 + (y - cy) ** 2 <= radius ** 2;
+  const inEllipse = (cx, cy, rx, ry) =>
+    ((x - cx) ** 2) / (rx ** 2) + ((y - cy) ** 2) / (ry ** 2) <= 1;
+
+  const head = inCircle(0, 0.86, 0.24) || inCircle(0, 1.12, 0.12);
+  const shoulders = inEllipse(0, 0.44, 0.62, 0.32);
+  const torso = inEllipse(0, 0.04, 0.42, 0.52);
+  const arms = inEllipse(-0.46, 0.05, 0.16, 0.28) || inEllipse(0.46, 0.05, 0.16, 0.28);
+  const lap = inEllipse(0, -0.54, 0.9, 0.36);
+  const lotus =
+    inEllipse(-0.42, -0.88, 0.34, 0.16) ||
+    inEllipse(0, -0.92, 0.44, 0.18) ||
+    inEllipse(0.42, -0.88, 0.34, 0.16);
+  const innerGap =
+    inEllipse(0, 0.2, 0.15, 0.26) && y < 0.46 && y > -0.08 && Math.abs(x) < 0.22;
+
+  return (head || shoulders || torso || arms || lap || lotus) && !innerGap;
+}
+
+function addVolume(x, y, z, amount) {
+  return [
+    x + (Math.random() - 0.5) * amount,
+    y + (Math.random() - 0.5) * amount,
+    z + (Math.random() - 0.5) * amount,
+  ];
+}
+
+function lerp(start, end, progress) {
+  return start + (end - start) * progress;
 }
