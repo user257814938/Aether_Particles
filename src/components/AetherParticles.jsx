@@ -8,12 +8,12 @@ import styles from "./AetherParticles.module.css";
 const { Hands } = handsPackage;
 
 const PRESETS = {
-  sphere: { label: "Sphere", color: "#3b82f6" },
-  heart: { label: "Heart", color: "#ec4899" },
-  saturn: { label: "Saturn", color: "#fbbf24" },
-  buddha: { label: "Buddha", color: "#f97316" },
-  flower: { label: "Flower", color: "#22c55e" },
-  fireworks: { label: "Fireworks", color: "#ef4444" },
+  sphere: { label: "Sphere", color: "#3b82f6", icon: "\u25CF" },
+  heart: { label: "Heart", color: "#ec4899", icon: "\u2665" },
+  saturn: { label: "Saturn", color: "#fbbf24", icon: "\u{1FA90}" },
+  buddha: { label: "Buddha", color: "#f97316", icon: "\u2638" },
+  flower: { label: "Flower", color: "#22c55e", icon: "\u273F" },
+  fireworks: { label: "Fireworks", color: "#ef4444", icon: "\u2726" },
 };
 
 const DEFAULT_STATUS = {
@@ -27,12 +27,6 @@ export default function AetherParticles() {
   const hiddenVideoRef = useRef(null);
   const previewVideoRef = useRef(null);
   const animationFrameRef = useRef(0);
-  const sceneRef = useRef(null);
-  const cameraRef = useRef(null);
-  const rendererRef = useRef(null);
-  const geometryRef = useRef(null);
-  const materialRef = useRef(null);
-  const particlesRef = useRef(null);
   const targetPositionsRef = useRef(new Float32Array());
   const handsRef = useRef(null);
   const mediaStreamRef = useRef(null);
@@ -48,6 +42,7 @@ export default function AetherParticles() {
   const [particleColor, setParticleColor] = useState(PRESETS.sphere.color);
   const [status, setStatus] = useState(DEFAULT_STATUS);
   const [forceLevel, setForceLevel] = useState(0);
+  const [isGuideOpen, setIsGuideOpen] = useState(true);
 
   useEffect(() => {
     activePresetRef.current = preset;
@@ -58,10 +53,20 @@ export default function AetherParticles() {
 
   useEffect(() => {
     colorTargetRef.current.set(particleColor);
-    if (materialRef.current) {
-      materialRef.current.color.set(particleColor);
-    }
   }, [particleColor]);
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setIsGuideOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -78,15 +83,12 @@ export default function AetherParticles() {
 
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    rendererRef.current = renderer;
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x000000);
-    sceneRef.current = scene;
 
     const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
     camera.position.z = 15;
-    cameraRef.current = camera;
 
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(particleCount * 3);
@@ -96,7 +98,6 @@ export default function AetherParticles() {
     }
 
     geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    geometryRef.current = geometry;
 
     const material = new THREE.PointsMaterial({
       size: 0.05,
@@ -106,11 +107,9 @@ export default function AetherParticles() {
       depthWrite: false,
       blending: THREE.AdditiveBlending,
     });
-    materialRef.current = material;
 
     const particles = new THREE.Points(geometry, material);
     scene.add(particles);
-    particlesRef.current = particles;
 
     targetPositionsRef.current = buildPresetPositions(activePresetRef.current, particleCount);
 
@@ -137,6 +136,23 @@ export default function AetherParticles() {
       );
     };
 
+    const syncPreviewStream = () => {
+      if (!previewVideoRef.current || !hiddenVideoRef.current?.srcObject) {
+        return;
+      }
+
+      previewVideoRef.current.srcObject = hiddenVideoRef.current.srcObject;
+      previewVideoRef.current.play().catch(() => {});
+    };
+
+    const resize = () => {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      renderer.setSize(width, height, false);
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+    };
+
     const handleResults = (results) => {
       const handLandmarks = results.multiHandLandmarks ?? [];
 
@@ -150,12 +166,12 @@ export default function AetherParticles() {
         });
 
         const averageTension = totalTension / handLandmarks.length;
-        // Convert hand openness into a UI-friendly 0-1 force gauge.
         const opennessForce = THREE.MathUtils.clamp(
           THREE.MathUtils.mapLinear(averageTension, 0.1, 0.5, 0, 1),
           0,
           1,
         );
+
         targetExpansionRef.current = THREE.MathUtils.clamp(
           THREE.MathUtils.mapLinear(averageTension, 0.1, 0.5, 0.2, 2.5),
           0.2,
@@ -178,25 +194,6 @@ export default function AetherParticles() {
         tone: "neutral",
         text: "Camera active. Place ta main dans le cadre pour reprendre le controle.",
       });
-    };
-
-    const syncPreviewStream = () => {
-      if (!previewVideoRef.current || !hiddenVideoRef.current?.srcObject) {
-        return;
-      }
-
-      previewVideoRef.current.srcObject = hiddenVideoRef.current.srcObject;
-      previewVideoRef.current
-        .play()
-        .catch(() => {});
-    };
-
-    const resize = () => {
-      const width = window.innerWidth;
-      const height = window.innerHeight;
-      renderer.setSize(width, height, false);
-      camera.aspect = width / height;
-      camera.updateProjectionMatrix();
     };
 
     const renderFrame = () => {
@@ -343,8 +340,21 @@ export default function AetherParticles() {
       <canvas ref={canvasRef} className={styles.canvas} />
 
       <section className={styles.panel}>
-        <p className={styles.kicker}>Hand Gesture Lab</p>
-        <h1 className={styles.title}>Aether Particles</h1>
+        <div className={styles.panelHeader}>
+          <div>
+            <p className={styles.kicker}>Hand Gesture Lab</p>
+            <h1 className={styles.title}>Aether Particles</h1>
+          </div>
+
+          <button
+            type="button"
+            className={styles.helpButton}
+            onClick={() => setIsGuideOpen(true)}
+          >
+            Aide ?
+          </button>
+        </div>
+
         <p className={styles.status} data-tone={status.tone}>
           {status.text}
         </p>
@@ -360,7 +370,10 @@ export default function AetherParticles() {
                 className={styles.presetButton}
                 data-active={preset === key}
               >
-                {value.label}
+                <span className={styles.presetIcon} aria-hidden="true">
+                  {value.icon}
+                </span>
+                <span className={styles.presetLabel}>{value.label}</span>
               </button>
             ))}
           </div>
@@ -389,7 +402,6 @@ export default function AetherParticles() {
         </div>
       </section>
 
-      {/* Bottom-left dock: force gauge and camera preview grouped together. */}
       <div className={styles.bottomDock}>
         <section className={styles.forceCard}>
           <div className={styles.forceHeader}>
@@ -399,39 +411,92 @@ export default function AetherParticles() {
 
           <div className={styles.forceMeter}>
             <span className={styles.forceIcon} aria-hidden="true">
-              ✊
+              {"\u270A"}
             </span>
 
             <div className={styles.forceTrack} aria-label="Jauge de force d'ouverture de la main">
-              <div
-                className={styles.forceFill}
-                style={{ width: `${forcePercent}%` }}
-              />
-              <div
-                className={styles.forceThumb}
-                style={{ left: `${forcePercent}%` }}
-              />
+              <div className={styles.forceFill} style={{ width: `${forcePercent}%` }} />
+              <div className={styles.forceThumb} style={{ left: `${forcePercent}%` }} />
             </div>
 
             <span className={styles.forceIcon} aria-hidden="true">
-              🖐
+              {"\u270B"}
             </span>
           </div>
         </section>
 
         <section className={styles.cameraCard}>
           <p className={styles.cameraLabel}>Camera</p>
-          <video
-            ref={previewVideoRef}
-            className={styles.previewVideo}
-            autoPlay
-            playsInline
-            muted
-          />
+          <video ref={previewVideoRef} className={styles.previewVideo} autoPlay playsInline muted />
         </section>
       </div>
 
       <video ref={hiddenVideoRef} className={styles.hiddenVideo} playsInline muted />
+
+      <div
+        className={`${styles.guideOverlay} ${
+          isGuideOpen ? styles.guideOverlayVisible : styles.guideOverlayHidden
+        }`}
+        aria-hidden={!isGuideOpen}
+      >
+        <section className={styles.guideCard} role="dialog" aria-modal="true" aria-label="Guide d'accueil">
+          <p className={styles.guideEyebrow}>Guide d'accueil</p>
+          <h2 className={styles.guideTitle}>Comment utiliser le systeme</h2>
+          <p className={styles.guideText}>
+            La camera transforme l'ouverture de ta main en force. Main fermee: la jauge
+            retombe. Main ouverte: la jauge monte et la sculpture se deploie.
+          </p>
+
+          <div className={styles.guideSteps}>
+            <div className={styles.guideStep}>
+              <span className={styles.guideStepNumber}>1</span>
+              <div>
+                <strong className={styles.guideStepTitle}>Autorise la camera</strong>
+                <p className={styles.guideStepText}>
+                  Reste visible dans l'aperçu en bas a gauche pour que le suivi reste stable.
+                </p>
+              </div>
+            </div>
+
+            <div className={styles.guideStep}>
+              <span className={styles.guideStepNumber}>2</span>
+              <div>
+                <strong className={styles.guideStepTitle}>Observe la jauge</strong>
+                <p className={styles.guideStepText}>
+                  Elle passe de 0% a 100% selon l'ouverture de la main, entre le poing ferme et la main ouverte.
+                </p>
+              </div>
+            </div>
+
+            <div className={styles.guideStep}>
+              <span className={styles.guideStepNumber}>3</span>
+              <div>
+                <strong className={styles.guideStepTitle}>Teste les modeles</strong>
+                <p className={styles.guideStepText}>
+                  Utilise les presets et la couleur du panneau gauche pour changer le rendu.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className={styles.guideLegend}>
+            <div className={styles.guideLegendItem}>
+              <span className={styles.guideLegendIcon}>{"\u270A"}</span>
+              <span>Poing ferme: force basse, particules contractees.</span>
+            </div>
+            <div className={styles.guideLegendItem}>
+              <span className={styles.guideLegendIcon}>{"\u270B"}</span>
+              <span>Main ouverte: force haute, particules ouvertes.</span>
+            </div>
+          </div>
+
+          <div className={styles.guideActions}>
+            <button type="button" className={styles.guideCloseButton} onClick={() => setIsGuideOpen(false)}>
+              Commencer
+            </button>
+          </div>
+        </section>
+      </div>
     </main>
   );
 }
@@ -490,8 +555,7 @@ function buildPresetPositions(type, particleCount) {
       case "buddha": {
         const angle = Math.random() * Math.PI * 2;
         const height = (Math.random() - 0.5) * 8;
-        const radius =
-          height < -2 ? 4 : height < 1 ? 2.5 : height < 3 ? 1.5 : 1;
+        const radius = height < -2 ? 4 : height < 1 ? 2.5 : height < 3 ? 1.5 : 1;
         x = Math.cos(angle) * radius * Math.random();
         y = height;
         z = Math.sin(angle) * radius * Math.random();
