@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import handsPackage from "@mediapipe/hands";
 import styles from "./AetherParticles.module.css";
@@ -35,10 +35,11 @@ const PRESET_SECTIONS = [
 const DEFAULT_STATUS = {
   id: "boot",
   tone: "neutral",
-  text: "Autorise la camera pour piloter la sculpture avec ta main.",
+  text: "Allow camera access to control the sculpture with your hand.",
 };
 
 export default function AetherParticles() {
+  const panelRef = useRef(null);
   const canvasRef = useRef(null);
   const hiddenVideoRef = useRef(null);
   const previewVideoRef = useRef(null);
@@ -59,6 +60,11 @@ export default function AetherParticles() {
   const [particleColor, setParticleColor] = useState(PRESETS.sphere.color);
   const [status, setStatus] = useState(DEFAULT_STATUS);
   const [forceLevel, setForceLevel] = useState(0);
+  const [cameraDockMetrics, setCameraDockMetrics] = useState({
+    left: 24,
+    top: 24,
+    width: 356,
+  });
   // The onboarding guide opens by default, then becomes user-controlled via the left panel.
   const [isGuideOpen, setIsGuideOpen] = useState(true);
 
@@ -100,6 +106,41 @@ export default function AetherParticles() {
     window.addEventListener("keydown", handleKeyDown);
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!panelRef.current) {
+      return undefined;
+    }
+
+    const updateMetrics = () => {
+      const panel = panelRef.current;
+
+      if (!panel) {
+        return;
+      }
+
+      const rect = panel.getBoundingClientRect();
+      setCameraDockMetrics({
+        left: rect.left,
+        top: rect.bottom + 16,
+        width: rect.width,
+      });
+    };
+
+    updateMetrics();
+
+    const resizeObserver = new ResizeObserver(() => {
+      updateMetrics();
+    });
+
+    resizeObserver.observe(panelRef.current);
+    window.addEventListener("resize", updateMetrics);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", updateMetrics);
     };
   }, []);
 
@@ -227,7 +268,7 @@ export default function AetherParticles() {
         updateStatus({
           id: "tracking",
           tone: "ready",
-          text: "Tracking actif: main ouverte pour etendre, poing ferme pour regrouper.",
+          text: "Tracking active: open your hand to expand, close it to gather.",
         });
         return;
       }
@@ -237,7 +278,7 @@ export default function AetherParticles() {
       updateStatus({
         id: "idle",
         tone: "neutral",
-        text: "Camera active. Place ta main dans le cadre pour reprendre le controle.",
+        text: "Camera active. Place your hand in frame to resume control.",
       });
     };
 
@@ -258,7 +299,7 @@ export default function AetherParticles() {
             updateStatus({
               id: "tracking-error",
               tone: "error",
-              text: "Le suivi de main a echoue dans cette session. Recharge la page pour reessayer.",
+              text: "Hand tracking failed in this session. Reload the page to try again.",
             });
           })
           .finally(() => {
@@ -399,7 +440,7 @@ export default function AetherParticles() {
         updateStatus({
           id: "camera-ready",
           tone: "ready",
-          text: "Camera connectee. Ouvre la main pour disperser les particules.",
+          text: "Camera connected. Open your hand to spread the particles.",
         });
         updateForceLevel(0);
       } catch (error) {
@@ -407,13 +448,13 @@ export default function AetherParticles() {
 
         const cameraMessageByError = {
           NotAllowedError:
-            "Acces camera refuse. Autorise la camera dans le navigateur pour activer le controle gestuel.",
+            "Camera access denied. Allow the camera in your browser to enable gesture control.",
           NotReadableError:
-            "La camera est deja utilisee par une autre application ou indisponible. Ferme l'autre application puis recharge la page.",
+            "The camera is already in use by another application or unavailable. Close the other app and reload the page.",
           NotFoundError:
-            "Aucune camera detectee sur cet appareil. Le preset reste visible, mais sans controle gestuel.",
+            "No camera detected on this device. The preset remains visible, but gesture control is unavailable.",
           AbortError:
-            "Le demarrage camera a ete interrompu. Recharge la page pour reessayer.",
+            "Camera startup was interrupted. Reload the page to try again.",
         };
 
         if (!cameraMessageByError[error?.name]) {
@@ -425,7 +466,7 @@ export default function AetherParticles() {
           tone: "error",
           text:
             cameraMessageByError[error?.name] ??
-            "Acces camera refuse ou indisponible. Le preset reste visible, mais sans controle gestuel.",
+            "Camera access was denied or is unavailable. The preset remains visible, but gesture control is unavailable.",
         });
       }
     };
@@ -467,130 +508,155 @@ export default function AetherParticles() {
   };
 
   const forcePercent = Math.round(forceLevel * 100);
+  const showStatusNote = status.tone === "error";
+  const cameraDockStyle = useMemo(
+    () => ({
+      left: `${cameraDockMetrics.left}px`,
+      top: `${cameraDockMetrics.top}px`,
+      width: `${cameraDockMetrics.width}px`,
+    }),
+    [cameraDockMetrics],
+  );
 
   return (
     <main className={styles.page}>
       <canvas ref={canvasRef} className={styles.canvas} />
 
-      <section className={styles.panel}>
+      <section ref={panelRef} className={styles.panel}>
         <div className={styles.panelHeader}>
-          <div>
-            <p className={styles.kicker}>Hand Gesture Lab</p>
-            <h1 className={styles.title}>Aether Particles</h1>
+          <div className={styles.brand}>
+            <AetherLogo className={styles.logo} />
+            <div>
+              <h1 className={styles.title}>aether</h1>
+              <p className={styles.description}>Gesture-reactive particle sculpture.</p>
+            </div>
           </div>
-
-          <button
-            type="button"
-            className={styles.helpButton}
-            onClick={() => setIsGuideOpen(true)}
-          >
-            Aide ?
-          </button>
         </div>
 
-        <p className={styles.status} data-tone={status.tone}>
-          {status.text}
-        </p>
+        {showStatusNote ? (
+          <p className={styles.status} data-tone={status.tone}>
+            {status.text}
+          </p>
+        ) : null}
 
-        <div className={styles.block}>
-          <span className={styles.label}>Shape Template</span>
-          <div className={styles.presetGrid}>
-            {presetSections.map((section, sectionIndex) => (
-              <div key={`section-${sectionIndex}`} className={styles.presetSection}>
-                {section.map(([key, value]) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => handlePresetChange(key)}
-                    className={styles.presetButton}
-                    data-active={preset === key}
-                  >
-                    <span className={styles.presetIcon} aria-hidden="true">
-                      {value.icon}
-                    </span>
-                    <span className={styles.presetLabel}>{value.label}</span>
-                  </button>
-                ))}
+        <div className={styles.panelBody}>
+          <div className={styles.block}>
+            <span className={styles.label}>Shape Template</span>
+            <div className={styles.presetGrid}>
+              {presetSections.map((section, sectionIndex) => (
+                <div key={`section-${sectionIndex}`} className={styles.presetGroup}>
+                  <div className={styles.presetSection}>
+                    {section.map(([key, value]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => handlePresetChange(key)}
+                        className={styles.presetButton}
+                        data-active={preset === key}
+                      >
+                        <span className={styles.presetIcon} aria-hidden="true">
+                          {value.icon}
+                        </span>
+                        <span className={styles.presetLabel}>{value.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <div className={styles.presetDivider} aria-hidden="true" />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className={styles.block}>
+            <label htmlFor="particle-color" className={styles.label}>
+              Color
+            </label>
+            <div className={styles.colorCard}>
+              <label htmlFor="particle-color" className={styles.colorControl}>
+                <span
+                  className={styles.colorPreview}
+                  style={{ "--preview-color": particleColor }}
+                />
+                <span className={styles.colorMeta}>
+                  <span className={styles.colorName}>Custom Color</span>
+                  <span className={styles.colorValue}>{particleColor.toUpperCase()}</span>
+                </span>
+                <span className={styles.colorArrow} aria-hidden="true">
+                  |
+                </span>
+                <input
+                  id="particle-color"
+                  type="color"
+                  value={particleColor}
+                  onChange={(event) => setParticleColor(event.target.value)}
+                  className={styles.colorInput}
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className={styles.block}>
+            <span className={styles.label}>Force</span>
+            <div className={styles.sidebarMeter}>
+              <div className={styles.forceMeter}>
+                <span className={styles.forceIcon} aria-hidden="true">
+                  {"\u270A"}
+                </span>
+
+                <div className={styles.forceTrack} aria-label="Hand openness force meter">
+                  <div className={styles.forceFill} style={{ width: `${forcePercent}%` }} />
+                  <div className={styles.forceThumb} style={{ left: `${forcePercent}%` }} />
+                </div>
+
+                <span className={styles.forceIcon} aria-hidden="true">
+                  {"\u270B"}
+                </span>
               </div>
-            ))}
+            </div>
           </div>
+
         </div>
 
-        <div className={styles.block}>
-          <label htmlFor="particle-color" className={styles.label}>
-            Core Color
-          </label>
-          <input
-            id="particle-color"
-            type="color"
-            value={particleColor}
-            onChange={(event) => setParticleColor(event.target.value)}
-            className={styles.colorInput}
-          />
-        </div>
-
-        <div className={styles.instructions}>
-          <p>
-            <strong>Open hand</strong>: expand particles
-          </p>
-          <p>
-            <strong>Fist</strong>: contract and gather
-          </p>
-        </div>
+        <button
+          type="button"
+          className={styles.helpButton}
+          onClick={() => setIsGuideOpen(true)}
+        >
+          <span className={styles.helpButtonIcon} aria-hidden="true">
+            ↗
+          </span>
+          <span>How to use the system</span>
+        </button>
       </section>
 
-      {/* Bottom-left utility dock: live force feedback + camera placement preview. */}
-      <div className={styles.bottomDock}>
-        <section className={styles.forceCard}>
-          <div className={styles.forceHeader}>
-            <span className={styles.forceTitle}>Force</span>
-            <span className={styles.forceValue}>{forcePercent}%</span>
-          </div>
-
-          <div className={styles.forceMeter}>
-            <span className={styles.forceIcon} aria-hidden="true">
-              {"\u270A"}
-            </span>
-
-            <div className={styles.forceTrack} aria-label="Jauge de force d'ouverture de la main">
-              <div className={styles.forceFill} style={{ width: `${forcePercent}%` }} />
-              <div className={styles.forceThumb} style={{ left: `${forcePercent}%` }} />
-            </div>
-
-            <span className={styles.forceIcon} aria-hidden="true">
-              {"\u270B"}
-            </span>
-          </div>
-        </section>
-
-        <section className={styles.cameraCard}>
-          <p className={styles.cameraLabel}>Camera</p>
+      <div className={styles.cameraDock} style={cameraDockStyle}>
+        <div className={styles.cameraWrap}>
           <video ref={previewVideoRef} className={styles.previewVideo} autoPlay playsInline muted />
-        </section>
+        </div>
       </div>
 
       <video ref={hiddenVideoRef} className={styles.hiddenVideo} playsInline muted />
 
-      {/* Welcome guide shown on first load and reopened later through the "Aide ?" button. */}
+      {/* Welcome guide shown on first load and reopened later through the help button. */}
       <div
         className={`${styles.guideOverlay} ${
           isGuideOpen ? styles.guideOverlayVisible : styles.guideOverlayHidden
         }`}
         aria-hidden={!isGuideOpen}
       >
-        <section className={styles.guideCard} role="dialog" aria-modal="true" aria-label="Guide d'accueil">
-          <p className={styles.guideEyebrow}>Guide d'accueil</p>
-          <h2 className={styles.guideTitle}>Comment utiliser le systeme</h2>
+        <section className={styles.guideCard} role="dialog" aria-modal="true" aria-label="Welcome guide">
+          <p className={styles.guideEyebrow}>Welcome guide</p>
+          <h2 className={styles.guideTitle}>How to use the system</h2>
           <p className={styles.guideText}>
-            La camera transforme l'ouverture de ta main en force. Main fermee: la jauge
-            retombe. Main ouverte: la jauge monte et la sculpture se deploie.
+            The camera transforms your hand openness into force. Closed fist: the meter
+            drops. Open hand: the meter rises and the sculpture unfolds.
           </p>
 
           <div className={styles.guideSteps}>
             <div className={styles.guideStep}>
               <span className={styles.guideStepNumber}>1</span>
               <div>
-                <strong className={styles.guideStepTitle}>Autorise la camera</strong>
+                <strong className={styles.guideStepTitle}>Allow the camera</strong>
                 <p className={styles.guideStepText}>
                   Reste visible dans l'aperçu en bas a gauche pour que le suivi reste stable.
                 </p>
@@ -600,9 +666,9 @@ export default function AetherParticles() {
             <div className={styles.guideStep}>
               <span className={styles.guideStepNumber}>2</span>
               <div>
-                <strong className={styles.guideStepTitle}>Observe la jauge</strong>
+                <strong className={styles.guideStepTitle}>Watch the meter</strong>
                 <p className={styles.guideStepText}>
-                  Elle passe de 0% a 100% selon l'ouverture de la main, entre le poing ferme et la main ouverte.
+                  It moves from 0% to 100% based on your hand opening, from closed fist to open hand.
                 </p>
               </div>
             </div>
@@ -610,9 +676,9 @@ export default function AetherParticles() {
             <div className={styles.guideStep}>
               <span className={styles.guideStepNumber}>3</span>
               <div>
-                <strong className={styles.guideStepTitle}>Teste les modeles</strong>
+                <strong className={styles.guideStepTitle}>Try the presets</strong>
                 <p className={styles.guideStepText}>
-                  Utilise les presets et la couleur du panneau gauche pour changer le rendu.
+                  Use the presets and color tools in the left panel to change the result.
                 </p>
               </div>
             </div>
@@ -621,22 +687,54 @@ export default function AetherParticles() {
           <div className={styles.guideLegend}>
             <div className={styles.guideLegendItem}>
               <span className={styles.guideLegendIcon}>{"\u270A"}</span>
-              <span>Poing ferme: force basse, particules contractees.</span>
+              <span>Closed fist: low force, contracted particles.</span>
             </div>
             <div className={styles.guideLegendItem}>
               <span className={styles.guideLegendIcon}>{"\u270B"}</span>
-              <span>Main ouverte: force haute, particules ouvertes.</span>
+              <span>Open hand: high force, expanded particles.</span>
             </div>
           </div>
 
           <div className={styles.guideActions}>
             <button type="button" className={styles.guideCloseButton} onClick={() => setIsGuideOpen(false)}>
-              Commencer
+              Start
             </button>
           </div>
         </section>
       </div>
     </main>
+  );
+}
+
+function AetherLogo({ className }) {
+  return (
+    <svg viewBox="0 0 64 64" className={className} aria-hidden="true">
+      <defs>
+        <linearGradient id="aether-logo-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#f5d0fe" />
+          <stop offset="52%" stopColor="#7dd3fc" />
+          <stop offset="100%" stopColor="#60a5fa" />
+        </linearGradient>
+      </defs>
+      <path
+        d="M18 38c7-14 21-21 30-14 6 4 6 11 2 17"
+        fill="none"
+        stroke="url(#aether-logo-gradient)"
+        strokeWidth="4"
+        strokeLinecap="round"
+      />
+      <path
+        d="M18 26c9 12 24 17 32 10"
+        fill="none"
+        stroke="url(#aether-logo-gradient)"
+        strokeWidth="3.4"
+        strokeLinecap="round"
+        opacity="0.9"
+      />
+      <circle cx="24" cy="24" r="3.5" fill="#f8fafc" />
+      <circle cx="42" cy="34" r="5.5" fill="#f8fafc" opacity="0.92" />
+      <circle cx="50" cy="20" r="2.8" fill="#7dd3fc" opacity="0.95" />
+    </svg>
   );
 }
 
