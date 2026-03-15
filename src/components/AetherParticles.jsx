@@ -47,6 +47,7 @@ export default function AetherParticles() {
   const [preset, setPreset] = useState("sphere");
   const [particleColor, setParticleColor] = useState(PRESETS.sphere.color);
   const [status, setStatus] = useState(DEFAULT_STATUS);
+  const [forceLevel, setForceLevel] = useState(0);
 
   useEffect(() => {
     activePresetRef.current = preset;
@@ -123,6 +124,19 @@ export default function AetherParticles() {
       );
     };
 
+    const updateForceLevel = (nextForceLevel) => {
+      if (!mountedRef.current) {
+        return;
+      }
+
+      const clampedForce = THREE.MathUtils.clamp(nextForceLevel, 0, 1);
+      setForceLevel((previousForceLevel) =>
+        Math.abs(previousForceLevel - clampedForce) < 0.015
+          ? previousForceLevel
+          : clampedForce,
+      );
+    };
+
     const handleResults = (results) => {
       const handLandmarks = results.multiHandLandmarks ?? [];
 
@@ -136,11 +150,18 @@ export default function AetherParticles() {
         });
 
         const averageTension = totalTension / handLandmarks.length;
+        // Convert hand openness into a UI-friendly 0-1 force gauge.
+        const opennessForce = THREE.MathUtils.clamp(
+          THREE.MathUtils.mapLinear(averageTension, 0.1, 0.5, 0, 1),
+          0,
+          1,
+        );
         targetExpansionRef.current = THREE.MathUtils.clamp(
           THREE.MathUtils.mapLinear(averageTension, 0.1, 0.5, 0.2, 2.5),
           0.2,
           2.5,
         );
+        updateForceLevel(opennessForce);
 
         updateStatus({
           id: "tracking",
@@ -151,6 +172,7 @@ export default function AetherParticles() {
       }
 
       targetExpansionRef.current = 0.8;
+      updateForceLevel(0);
       updateStatus({
         id: "idle",
         tone: "neutral",
@@ -266,8 +288,10 @@ export default function AetherParticles() {
           tone: "ready",
           text: "Camera connectee. Ouvre la main pour disperser les particules.",
         });
+        updateForceLevel(0);
       } catch (error) {
         console.error(error);
+        updateForceLevel(0);
         updateStatus({
           id: "camera-error",
           tone: "error",
@@ -311,6 +335,8 @@ export default function AetherParticles() {
     setPreset(nextPreset);
     setParticleColor(PRESETS[nextPreset].color);
   };
+
+  const forcePercent = Math.round(forceLevel * 100);
 
   return (
     <main className={styles.page}>
@@ -363,14 +389,49 @@ export default function AetherParticles() {
         </div>
       </section>
 
+      {/* Bottom-left dock: force gauge and camera preview grouped together. */}
+      <div className={styles.bottomDock}>
+        <section className={styles.forceCard}>
+          <div className={styles.forceHeader}>
+            <span className={styles.forceTitle}>Force</span>
+            <span className={styles.forceValue}>{forcePercent}%</span>
+          </div>
+
+          <div className={styles.forceMeter}>
+            <span className={styles.forceIcon} aria-hidden="true">
+              ✊
+            </span>
+
+            <div className={styles.forceTrack} aria-label="Jauge de force d'ouverture de la main">
+              <div
+                className={styles.forceFill}
+                style={{ width: `${forcePercent}%` }}
+              />
+              <div
+                className={styles.forceThumb}
+                style={{ left: `${forcePercent}%` }}
+              />
+            </div>
+
+            <span className={styles.forceIcon} aria-hidden="true">
+              🖐
+            </span>
+          </div>
+        </section>
+
+        <section className={styles.cameraCard}>
+          <p className={styles.cameraLabel}>Camera</p>
+          <video
+            ref={previewVideoRef}
+            className={styles.previewVideo}
+            autoPlay
+            playsInline
+            muted
+          />
+        </section>
+      </div>
+
       <video ref={hiddenVideoRef} className={styles.hiddenVideo} playsInline muted />
-      <video
-        ref={previewVideoRef}
-        className={styles.previewVideo}
-        autoPlay
-        playsInline
-        muted
-      />
     </main>
   );
 }

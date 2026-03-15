@@ -142,19 +142,112 @@
   display: none;
 }
 
-.previewVideo {
+/* Dock anchored bottom-left for the moved camera preview and live force gauge. */
+.bottomDock {
   position: fixed;
-  right: 24px;
+  left: 24px;
   bottom: 24px;
   z-index: 2;
-  width: 180px;
-  height: 132px;
+  display: grid;
+  gap: 14px;
+  width: min(320px, calc(100vw - 32px));
+}
+
+.forceCard,
+.cameraCard {
+  padding: 16px;
+  border-radius: 20px;
+  background: rgba(15, 15, 15, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
+}
+
+.forceHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.forceTitle,
+.cameraLabel {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.46);
+}
+
+.forceValue {
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.forceMeter {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.forceIcon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 18px;
+}
+
+.forceTrack {
+  position: relative;
+  height: 14px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.forceFill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #334155 0%, #3b82f6 50%, #7dd3fc 100%);
+  box-shadow: 0 0 22px rgba(59, 130, 246, 0.45);
+}
+
+.forceThumb {
+  position: absolute;
+  top: 50%;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid rgba(59, 130, 246, 0.85);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.28);
+  transform: translate(-50%, -50%);
+}
+
+.cameraLabel {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.previewVideo {
+  position: static;
+  width: 100%;
+  aspect-ratio: 4 / 3;
   object-fit: cover;
   transform: scaleX(-1);
   border-radius: 16px;
   border: 2px solid rgba(59, 130, 246, 0.85);
   background: rgba(255, 255, 255, 0.04);
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
 }
 
 @media (max-width: 768px) {
@@ -166,10 +259,10 @@
     padding: 18px;
   }
 
-  .previewVideo {
+  .bottomDock {
+    left: 16px;
     right: 16px;
     bottom: 16px;
-    width: 128px;
-    height: 96px;
+    width: auto;
   }
 }
