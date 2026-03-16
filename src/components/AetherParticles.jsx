@@ -21,7 +21,7 @@ const PRESETS = {
   fireworks: { label: "Fireworks", color: "#b91c1c", icon: "\u2726", rotation: "full" },
   supernova: { label: "Supernova", color: "#8b5cf6", icon: "\u273A", rotation: "galaxyTilt" },
   cube: { label: "Cube", color: "#14b8a6", icon: "\u25A3", rotation: "full" },
-  square: { label: "Square", color: "#d97706", icon: "\u25A0", rotation: "drift" },
+  square: { label: "Square", color: "#d97706", icon: "\u25A0", rotation: "heartDrift" },
 };
 
 const PRESET_SECTIONS = [
@@ -1687,7 +1687,7 @@ function createCubePositions(particleCount) {
 // Square is intentionally tighter than the previous version so it reads as less zoomed-out on screen.
 function createSquarePositions(particleCount) {
   const targetPositions = new Float32Array(particleCount * 3);
-  const halfSize = 6.7;
+  const halfSize = 8.375;
   const thickness = 0.28;
 
   for (let index = 0; index < particleCount; index += 1) {
