@@ -195,6 +195,8 @@ export default function AetherParticles() {
   const [customPrompt, setCustomPrompt] = useState("");
   const [customHint, setCustomHint] = useState(DEFAULT_CUSTOM_HINT);
   const [customPlaceholder, setCustomPlaceholder] = useState("e.g. octagon");
+  const [isPreloaderVisible, setIsPreloaderVisible] = useState(true);
+  const [preloaderProgress, setPreloaderProgress] = useState(0);
   const [cameraDockMetrics, setCameraDockMetrics] = useState({
     left: 24,
     top: 24,
@@ -234,7 +236,7 @@ export default function AetherParticles() {
       if (nextPreset === "custom") {
         const shapeKey = searchParams.get("shape");
 
-        if (shapeKey && applyCustomPreset(shapeKey, false)) {
+        if (shapeKey && applyCustomPreset(shapeKey, false, false)) {
           return;
         }
 
@@ -298,6 +300,31 @@ export default function AetherParticles() {
     } catch {
       setIsGuideOpen(true);
     }
+  }, []);
+
+  useEffect(() => {
+    const duration = 2400;
+    const start = performance.now();
+    let frameId = 0;
+
+    const tick = (timestamp) => {
+      const elapsed = Math.min(timestamp - start, duration);
+      const nextProgress = Math.round((elapsed / duration) * 100);
+      setPreloaderProgress(nextProgress);
+
+      if (elapsed >= duration) {
+        setIsPreloaderVisible(false);
+        return;
+      }
+
+      frameId = window.requestAnimationFrame(tick);
+    };
+
+    frameId = window.requestAnimationFrame(tick);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
   }, []);
 
   useEffect(() => {
@@ -748,7 +775,7 @@ export default function AetherParticles() {
     };
   }, []);
 
-  const applyCustomPreset = (shapeQuery, pushUrl = true) => {
+  const applyCustomPreset = (shapeQuery, pushUrl = true, preserveInput = true) => {
     const shapeDefinition = resolveCustomShape(shapeQuery);
 
     if (!shapeDefinition) {
@@ -769,7 +796,7 @@ export default function AetherParticles() {
     activePresetRef.current = "custom";
     setPreset("custom");
     setParticleColor(nextManifest.color);
-    setCustomPrompt(shapeDefinition.label);
+    setCustomPrompt(preserveInput ? shapeQuery : "");
     setCustomHint(`Generated: ${shapeDefinition.label}`);
 
     if (particleCountRef.current > 0) {
@@ -830,6 +857,23 @@ export default function AetherParticles() {
   return (
     <main className={styles.page}>
       <canvas ref={canvasRef} className={styles.canvas} />
+
+      <div
+        className={`${styles.preloader} ${
+          isPreloaderVisible ? styles.preloaderVisible : styles.preloaderHidden
+        }`}
+        aria-hidden={!isPreloaderVisible}
+      >
+        <div className={styles.preloaderCard}>
+          <AetherLogo className={styles.preloaderLogo} />
+          <p className={styles.preloaderTitle}>aether</p>
+          <p className={styles.preloaderText}>Shaping particles in real time</p>
+          <div className={styles.preloaderMeter} aria-live="polite">
+            <span className={styles.preloaderSlash}>/</span>
+            <span className={styles.preloaderProgress}>{preloaderProgress}</span>
+          </div>
+        </div>
+      </div>
 
       <section ref={panelRef} className={styles.panel}>
         <div className={styles.panelHeader}>
