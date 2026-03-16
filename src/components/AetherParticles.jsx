@@ -606,7 +606,7 @@ export default function AetherParticles() {
         particles.rotation.y += 0.002 * rotationDirectionRef.current.lotusUpperFull;
         particles.rotation.z += (0 - particles.rotation.z) * 0.08;
       } else if (rotationMode === "supernovaFixed") {
-        const targetX = -1.05 - (Math.sin(time * 0.78 - Math.PI / 2) * 0.5 + 0.5) * 0.3375;
+        const targetX = -0.9 - (Math.sin(time * 0.78 - Math.PI / 2) * 0.5 + 0.5) * 0.75;
         particles.rotation.x += (targetX - particles.rotation.x) * 0.08;
         particles.rotation.y += (0 - particles.rotation.y) * 0.08;
         particles.rotation.z += 0.0009 * rotationDirectionRef.current.supernovaFixed;
