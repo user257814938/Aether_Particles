@@ -13,7 +13,7 @@ const { Hands } = handsPackage;
 // - `rotation` decides whether the shape can tilt vertically or should stay front-facing
 const PRESETS = {
   sphere: { label: "Sphere", color: "#2563eb", icon: "\u25CF", rotation: "full" },
-  heart: { label: "Heart", color: "#dc2626", icon: "\u2665", rotation: "drift" },
+  heart: { label: "Heart", color: "#dc2626", icon: "\u2665", rotation: "heartDrift" },
   saturn: { label: "Saturn", color: "#caa46b", icon: "\u{1FA90}", rotation: "side" },
   buddha: { label: "Buddha", color: "#b7791f", icon: "\u2638", rotation: "drift" },
   flower: { label: "Flower", color: "#e11d48", icon: "\u273F", rotation: "lotusSweep" },
@@ -585,6 +585,13 @@ export default function AetherParticles() {
       } else if (rotationMode === "lotusSweep") {
         const targetX = -0.2 + Math.cos(time * 0.42) * 0.025;
         const targetY = (Math.sin(time * 0.42) * 0.5 + 0.5) * 1.12;
+        particles.rotation.x += (targetX - particles.rotation.x) * 0.08;
+        particles.rotation.y += (targetY - particles.rotation.y) * 0.08;
+        particles.rotation.z += (0 - particles.rotation.z) * 0.08;
+      } else if (rotationMode === "heartDrift") {
+        // Heart gets its own tuned motion profile: larger silhouette, stronger swing, slightly faster tempo.
+        const targetX = Math.sin(time * 1.045) * 0.1573;
+        const targetY = Math.cos(time * 0.792) * 0.2662;
         particles.rotation.x += (targetX - particles.rotation.x) * 0.08;
         particles.rotation.y += (targetY - particles.rotation.y) * 0.08;
         particles.rotation.z += (0 - particles.rotation.z) * 0.08;
@@ -1376,13 +1383,18 @@ function createSolidColors(particleCount, hexColor) {
 
 function createHeartPositions(particleCount) {
   const targetPositions = new Float32Array(particleCount * 3);
+  // Heart contour is intentionally over-sampled so the outline reads denser than the interior.
+  const contourCount = Math.floor(particleCount * 0.66);
 
   for (let index = 0; index < particleCount; index += 1) {
     const offset = index * 3;
     const t = Math.random() * 2 * Math.PI;
-    const scale = 0.3;
-    const fillBias = lerp(0.72, 1, Math.sqrt(Math.random()));
-    const jitter = (Math.random() - 0.5) * 0.08;
+    const scale = 0.45;
+    const isContour = index < contourCount;
+    const fillBias = isContour
+      ? lerp(0.94, 1.02, Math.random())
+      : lerp(0.62, 0.96, Math.sqrt(Math.random()));
+    const jitter = (Math.random() - 0.5) * (isContour ? 0.04 : 0.08);
 
     targetPositions[offset] = 16 * Math.sin(t) ** 3 * scale * fillBias + jitter;
     targetPositions[offset + 1] =
