@@ -14,7 +14,7 @@ const { Hands } = handsPackage;
 const PRESETS = {
   sphere: { label: "Sphere", color: "#2563eb", icon: "\u25CF", rotation: "sphereFull" },
   heart: { label: "Heart", color: "#dc2626", icon: "\u2665", rotation: "heartDrift" },
-  saturn: { label: "Saturn", color: "#caa46b", icon: "\u{1FA90}", rotation: "side" },
+  saturn: { label: "Saturn", color: "#caa46b", icon: "\u{1FA90}", rotation: "saturnSide" },
   buddha: { label: "Buddha", color: "#b7791f", icon: "\u2638", rotation: "heartDrift" },
   flower: { label: "Flower", color: "#e11d48", icon: "\u273F", rotation: "heartDrift" },
   lotus: { label: "Lotus", color: "#ec4899", icon: "\u{1FAB7}", rotation: "lotusUpperFull" },
@@ -633,6 +633,12 @@ export default function AetherParticles() {
       } else if (rotationMode === "galaxyTilt") {
         const targetX = 1.72 + Math.sin(time * 0.56) * 0.62;
         const targetY = Math.cos(time * 0.44) * 0.18;
+        particles.rotation.x += (targetX - particles.rotation.x) * 0.08;
+        particles.rotation.y += (targetY - particles.rotation.y) * 0.08;
+        particles.rotation.z += (0 - particles.rotation.z) * 0.08;
+      } else if (rotationMode === "saturnSide") {
+        const targetX = 0.36 + Math.sin(time * 1.045) * 0.13;
+        const targetY = 0.82 + Math.cos(time * 0.792) * 0.08;
         particles.rotation.x += (targetX - particles.rotation.x) * 0.08;
         particles.rotation.y += (targetY - particles.rotation.y) * 0.08;
         particles.rotation.z += (0 - particles.rotation.z) * 0.08;
@@ -1434,6 +1440,8 @@ function createHeartPositions(particleCount) {
 function createSaturnPositions(particleCount) {
   const targetPositions = new Float32Array(particleCount * 3);
   const coreCount = Math.floor(particleCount * 0.46);
+  const scale = 1.5;
+  const coreRadius = 3.5 * scale;
 
   for (let index = 0; index < particleCount; index += 1) {
     const offset = index * 3;
@@ -1443,7 +1451,7 @@ function createSaturnPositions(particleCount) {
       const v = Math.random();
       const theta = 2 * Math.PI * u;
       const phi = Math.acos(2 * v - 1);
-      const radialDistance = Math.cbrt(Math.random()) * 3.5;
+      const radialDistance = Math.cbrt(Math.random()) * coreRadius;
 
       targetPositions[offset] = radialDistance * Math.sin(phi) * Math.cos(theta);
       targetPositions[offset + 1] = radialDistance * Math.sin(phi) * Math.sin(theta);
@@ -1451,10 +1459,10 @@ function createSaturnPositions(particleCount) {
       continue;
     }
 
-    const distance = 4.8 + Math.random() * 3.2;
+    const distance = (4.8 + Math.random() * 3.2) * scale;
     const angle = Math.random() * Math.PI * 2;
     targetPositions[offset] = Math.cos(angle) * distance;
-    targetPositions[offset + 1] = (Math.random() - 0.5) * 0.6;
+    targetPositions[offset + 1] = (Math.random() - 0.5) * 0.6 * scale;
     targetPositions[offset + 2] = Math.sin(angle) * distance;
   }
 
