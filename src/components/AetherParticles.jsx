@@ -14,7 +14,7 @@ const { Hands } = handsPackage;
 const PRESETS = {
   sphere: { label: "Sphere", color: "#2563eb", icon: "\u25CF", rotation: "sphereFull" },
   heart: { label: "Heart", color: "#dc2626", icon: "\u2665", rotation: "heartDrift" },
-  saturn: { label: "Saturn", color: "#caa46b", icon: "\u{1FA90}", rotation: "saturnSide" },
+  saturn: { label: "Saturn", color: "#caa46b", icon: "\u{1FA90}", rotation: "lotusUpperFull" },
   buddha: { label: "Buddha", color: "#b7791f", icon: "\u2638", rotation: "heartDrift" },
   flower: { label: "Flower", color: "#e11d48", icon: "\u273F", rotation: "heartDrift" },
   lotus: { label: "Lotus", color: "#ec4899", icon: "\u{1FAB7}", rotation: "lotusUpperFull" },
@@ -1440,7 +1440,7 @@ function createHeartPositions(particleCount) {
 function createSaturnPositions(particleCount) {
   const targetPositions = new Float32Array(particleCount * 3);
   const coreCount = Math.floor(particleCount * 0.46);
-  const scale = 1.5;
+  const scale = 1.125;
   const coreRadius = 3.5 * scale;
 
   for (let index = 0; index < particleCount; index += 1) {
