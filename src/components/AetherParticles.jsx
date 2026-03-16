@@ -37,6 +37,7 @@ const DEFAULT_STATUS = {
   tone: "neutral",
   text: "Allow camera access to control the sculpture with your hand.",
 };
+const GUIDE_STORAGE_KEY = "aether-guide-dismissed";
 
 export default function AetherParticles() {
   const panelRef = useRef(null);
@@ -52,12 +53,12 @@ export default function AetherParticles() {
   const handRequestInFlightRef = useRef(false);
   const currentExpansionRef = useRef(0.5);
   const targetExpansionRef = useRef(0.5);
-  const colorTargetRef = useRef(new THREE.Color(PRESETS.sphere.color));
+  const colorTargetRef = useRef(new THREE.Color(PRESETS.heart.color));
   const particleCountRef = useRef(0);
   const mountedRef = useRef(false);
-  const activePresetRef = useRef("sphere");
-  const [preset, setPreset] = useState("sphere");
-  const [particleColor, setParticleColor] = useState(PRESETS.sphere.color);
+  const activePresetRef = useRef("heart");
+  const [preset, setPreset] = useState("heart");
+  const [particleColor, setParticleColor] = useState(PRESETS.heart.color);
   const [status, setStatus] = useState(DEFAULT_STATUS);
   const [forceLevel, setForceLevel] = useState(0);
   const [cameraDockMetrics, setCameraDockMetrics] = useState({
@@ -65,8 +66,8 @@ export default function AetherParticles() {
     top: 24,
     width: 356,
   });
-  // The onboarding guide opens by default, then becomes user-controlled via the left panel.
-  const [isGuideOpen, setIsGuideOpen] = useState(true);
+  // The onboarding guide opens only on the first visit, then remains user-controlled via the left panel.
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
 
   const presetSections = PRESET_SECTIONS.map((section) =>
     section.map((key) => [key, PRESETS[key]]),
@@ -99,7 +100,7 @@ export default function AetherParticles() {
   useEffect(() => {
     const handleKeyDown = (event) => {
       if (event.key === "Escape") {
-        setIsGuideOpen(false);
+        closeGuide();
       }
     };
 
@@ -107,6 +108,15 @@ export default function AetherParticles() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
+  }, []);
+
+  useEffect(() => {
+    try {
+      const hasDismissedGuide = window.localStorage.getItem(GUIDE_STORAGE_KEY) === "true";
+      setIsGuideOpen(!hasDismissedGuide);
+    } catch {
+      setIsGuideOpen(true);
+    }
   }, []);
 
   useEffect(() => {
@@ -144,6 +154,14 @@ export default function AetherParticles() {
     };
   }, []);
 
+  const closeGuide = () => {
+    setIsGuideOpen(false);
+
+    try {
+      window.localStorage.setItem(GUIDE_STORAGE_KEY, "true");
+    } catch {}
+  };
+
   useEffect(() => {
     const canvas = canvasRef.current;
     const hiddenVideo = hiddenVideoRef.current;
@@ -168,7 +186,7 @@ export default function AetherParticles() {
 
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(particleCount * 3);
-    const colors = createSolidColors(particleCount, PRESETS.sphere.color);
+    const colors = createSolidColors(particleCount, PRESETS.heart.color);
 
     for (let index = 0; index < positions.length; index += 1) {
       positions[index] = (Math.random() - 0.5) * 20;
@@ -525,10 +543,12 @@ export default function AetherParticles() {
       <section ref={panelRef} className={styles.panel}>
         <div className={styles.panelHeader}>
           <div className={styles.brand}>
-            <AetherLogo className={styles.logo} />
+            <a href="/" className={styles.logoLink} aria-label="Go to homepage">
+              <AetherLogo className={styles.logo} />
+            </a>
             <div>
               <h1 className={styles.title}>aether</h1>
-              <p className={styles.description}>Gesture-reactive particle sculpture.</p>
+              <p className={styles.description}>Gesture-reactive particle sculpture</p>
             </div>
           </div>
         </div>
@@ -550,10 +570,15 @@ export default function AetherParticles() {
                       <button
                         key={key}
                         type="button"
-                        onClick={() => handlePresetChange(key)}
-                        className={styles.presetButton}
-                        data-active={preset === key}
-                      >
+                      onClick={() => handlePresetChange(key)}
+                      className={styles.presetButton}
+                      data-active={preset === key}
+                      style={
+                        preset === key
+                          ? { "--active-preset-color": value.color }
+                          : undefined
+                      }
+                    >
                         <span className={styles.presetIcon} aria-hidden="true">
                           {value.icon}
                         </span>
@@ -569,7 +594,7 @@ export default function AetherParticles() {
 
           <div className={styles.block}>
             <label htmlFor="particle-color" className={styles.label}>
-              Custom Color
+              Custom Tools
             </label>
             <div className={styles.colorCard}>
               <label htmlFor="particle-color" className={styles.colorControl}>
@@ -592,7 +617,7 @@ export default function AetherParticles() {
           </div>
 
           <div className={styles.block}>
-            <span className={styles.label}>Force</span>
+            <span className={styles.label}>Meter</span>
             <div className={styles.sidebarMeter}>
               <div className={styles.forceMeter}>
                 <span className={styles.forceIcon} aria-hidden="true">
@@ -621,7 +646,7 @@ export default function AetherParticles() {
           onClick={() => setIsGuideOpen(true)}
         >
           <span className={styles.helpButtonIcon} aria-hidden="true">
-            ↗
+            {"\u2197"}
           </span>
           <span className={styles.helpButtonText}>How to use the system</span>
           </button>
@@ -642,22 +667,24 @@ export default function AetherParticles() {
           isGuideOpen ? styles.guideOverlayVisible : styles.guideOverlayHidden
         }`}
         aria-hidden={!isGuideOpen}
+        onClick={closeGuide}
       >
-        <section className={styles.guideCard} role="dialog" aria-modal="true" aria-label="Welcome guide">
+        <section
+          className={styles.guideCard}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Welcome guide"
+          onClick={(event) => event.stopPropagation()}
+        >
           <p className={styles.guideEyebrow}>Welcome guide</p>
           <h2 className={styles.guideTitle}>How to use the system</h2>
-          <p className={styles.guideText}>
-            The camera transforms your hand openness into force. Closed fist: the meter
-            drops. Open hand: the meter rises and the sculpture unfolds.
-          </p>
-
           <div className={styles.guideSteps}>
             <div className={styles.guideStep}>
               <span className={styles.guideStepNumber}>1</span>
               <div>
                 <strong className={styles.guideStepTitle}>Allow the camera</strong>
                 <p className={styles.guideStepText}>
-                  Reste visible dans l'aperçu en bas a gauche pour que le suivi reste stable.
+                  Stay visible in the lower-left preview so tracking remains stable.
                 </p>
               </div>
             </div>
@@ -677,7 +704,7 @@ export default function AetherParticles() {
               <div>
                 <strong className={styles.guideStepTitle}>Try the presets</strong>
                 <p className={styles.guideStepText}>
-                  Use the presets and color tools in the left panel to change the result.
+                  Use the presets and custom tools in the left panel to change the result.
                 </p>
               </div>
             </div>
@@ -686,16 +713,16 @@ export default function AetherParticles() {
           <div className={styles.guideLegend}>
             <div className={styles.guideLegendItem}>
               <span className={styles.guideLegendIcon}>{"\u270A"}</span>
-              <span>Closed fist: low force, contracted particles.</span>
+              <span>Closed fist: low meter, contracted particles.</span>
             </div>
             <div className={styles.guideLegendItem}>
               <span className={styles.guideLegendIcon}>{"\u270B"}</span>
-              <span>Open hand: high force, expanded particles.</span>
+              <span>Open hand: high meter, expanded particles.</span>
             </div>
           </div>
 
           <div className={styles.guideActions}>
-            <button type="button" className={styles.guideCloseButton} onClick={() => setIsGuideOpen(false)}>
+            <button type="button" className={styles.guideCloseButton} onClick={closeGuide}>
               Start
             </button>
           </div>
@@ -1232,3 +1259,5 @@ function addVolume(x, y, z, amount) {
 function lerp(start, end, progress) {
   return start + (end - start) * progress;
 }
+
+

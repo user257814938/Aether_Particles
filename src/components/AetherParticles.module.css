@@ -52,6 +52,11 @@
   gap: 14px;
 }
 
+.logoLink {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
 .logo {
   width: 44px;
   height: 44px;
@@ -189,11 +194,21 @@
 }
 
 .presetButton[data-active="true"] {
-  border-color: rgba(125, 211, 252, 0.92);
+  border-width: 3px;
+  border-color: var(--active-preset-color, rgba(186, 230, 253, 0.98));
   background: transparent;
+  color: var(--active-preset-color, #dbeafe);
   box-shadow:
-    inset 0 0 0 1px rgba(244, 114, 182, 0.22),
-    0 0 24px rgba(96, 165, 250, 0.22);
+    inset 0 0 0 1px color-mix(in srgb, var(--active-preset-color, #dbeafe) 32%, white),
+    0 0 28px color-mix(in srgb, var(--active-preset-color, #dbeafe) 26%, transparent);
+}
+
+.presetButton[data-active="true"] .presetIcon {
+  color: var(--active-preset-color, #f0f9ff);
+}
+
+.presetButton[data-active="true"] .presetLabel {
+  color: var(--active-preset-color, #f0f9ff);
 }
 
 .presetIcon {
@@ -492,10 +507,7 @@
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 14px;
-  padding: 14px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 4px 0;
 }
 
 .guideStepNumber {
@@ -535,19 +547,18 @@
 }
 
 .guideLegendIcon {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
   flex-shrink: 0;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 22px;
 }
 
 .guideActions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
   margin-top: 24px;
 }
 
