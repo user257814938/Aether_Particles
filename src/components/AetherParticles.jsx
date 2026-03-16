@@ -18,7 +18,7 @@ const PRESETS = {
   buddha: { label: "Buddha", color: "#b7791f", icon: "\u2638", rotation: "heartDrift" },
   flower: { label: "Flower", color: "#e11d48", icon: "\u273F", rotation: "heartDrift" },
   lotus: { label: "Lotus", color: "#ec4899", icon: "\u{1FAB7}", rotation: "lotusUpperFull" },
-  fireworks: { label: "Fireworks", color: "#b91c1c", icon: "\u2726", rotation: "full" },
+  fireworks: { label: "Fireworks", color: "#b91c1c", icon: "\u2726", rotation: "fireworksFull" },
   supernova: { label: "Supernova", color: "#8b5cf6", icon: "\u273A", rotation: "galaxyTilt" },
   cube: { label: "Cube", color: "#14b8a6", icon: "\u25A3", rotation: "cubeFull" },
   square: { label: "Square", color: "#d97706", icon: "\u25A0", rotation: "heartDrift" },
@@ -592,6 +592,10 @@ export default function AetherParticles() {
       } else if (rotationMode === "full") {
         particles.rotation.y += 0.002;
         particles.rotation.x += 0.001;
+        particles.rotation.z += (0 - particles.rotation.z) * 0.08;
+      } else if (rotationMode === "fireworksFull") {
+        particles.rotation.y += 0.0022;
+        particles.rotation.x += 0.0011;
         particles.rotation.z += (0 - particles.rotation.z) * 0.08;
       } else if (rotationMode === "lotusUpperFull") {
         // Lotus can orbit freely sideways, but its vertical sweep stays above the underside.
@@ -1576,11 +1580,12 @@ function createBuddhaPositions(particleCount) {
 
 function createFireworksPositions(particleCount) {
   const targetPositions = new Float32Array(particleCount * 3);
+  const scale = 1.125;
 
   for (let index = 0; index < particleCount; index += 1) {
     const offset = index * 3;
     const angle = Math.random() * Math.PI * 2;
-    const distance = Math.random() * 8;
+    const distance = Math.random() * 8 * scale;
 
     targetPositions[offset] = Math.cos(angle) * distance;
     targetPositions[offset + 1] = Math.sin(angle) * distance;
