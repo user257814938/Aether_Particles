@@ -39,7 +39,7 @@ const DEFAULT_STATUS = {
 };
 const GUIDE_STORAGE_KEY = "aether-guide-dismissed";
 const DEFAULT_PRESET = "heart";
-const ENABLE_PRELOADER = false;
+const ENABLE_PRELOADER = true;
 const DEFAULT_CUSTOM_HINT = "Try octagon, circle, hexagon, triangle, star, or spiral.";
 const CUSTOM_PLACEHOLDER_EXAMPLES = ["octagon", "circle", "hexagon", "triangle", "star", "spiral"];
 const CUSTOM_SHAPE_LIBRARY = {
@@ -309,10 +309,11 @@ export default function AetherParticles() {
 
     const tick = (timestamp) => {
       const elapsed = Math.min(timestamp - start, duration);
-      const nextProgress = Math.round((elapsed / duration) * 100);
+      const nextProgress = (elapsed / duration) * 100;
       setPreloaderProgress(nextProgress);
 
       if (elapsed >= duration) {
+        setPreloaderProgress(100);
         setIsPreloaderVisible(false);
         return;
       }
@@ -828,7 +829,7 @@ export default function AetherParticles() {
             <p className={styles.preloaderText}>Shaping particles in real time</p>
             <div className={styles.preloaderMeter} aria-live="polite">
               <span className={styles.preloaderSlash}>/</span>
-              <span className={styles.preloaderProgress}>{preloaderProgress}</span>
+              <span className={styles.preloaderProgress}>{Math.round(preloaderProgress)}</span>
             </div>
           </div>
         </div>
