@@ -19,7 +19,7 @@ const PRESETS = {
   flower: { label: "Flower", color: "#e11d48", icon: "\u273F", rotation: "heartDrift" },
   lotus: { label: "Lotus", color: "#ec4899", icon: "\u{1FAB7}", rotation: "lotusUpperFull" },
   fireworks: { label: "Fireworks", color: "#b91c1c", icon: "\u2726", rotation: "fireworksFull" },
-  supernova: { label: "Supernova", color: "#8b5cf6", icon: "\u273A", rotation: "galaxyTilt" },
+  supernova: { label: "Supernova", color: "#8b5cf6", icon: "\u273A", rotation: "supernovaFixed" },
   cube: { label: "Cube", color: "#14b8a6", icon: "\u25A3", rotation: "cubeFull" },
   square: { label: "Square", color: "#d97706", icon: "\u25A0", rotation: "heartDrift" },
 };
@@ -184,6 +184,8 @@ export default function AetherParticles() {
   const handRequestInFlightRef = useRef(false);
   const rotationDirectionRef = useRef({
     lotusUpperFull: Math.random() < 0.5 ? -1 : 1,
+    galaxyTilt: Math.random() < 0.5 ? -1 : 1,
+    supernovaFixed: Math.random() < 0.5 ? -1 : 1,
   });
   const currentExpansionRef = useRef(0.5);
   const targetExpansionRef = useRef(0.5);
@@ -375,7 +377,7 @@ export default function AetherParticles() {
 
     try {
       window.localStorage.setItem(GUIDE_STORAGE_KEY, "true");
-    } catch {}
+    } catch { }
   };
 
   useEffect(() => {
@@ -426,14 +428,14 @@ export default function AetherParticles() {
     const initialPresetData =
       activePresetRef.current === "custom" && customManifestRef.current
         ? {
-            positions: customManifestRef.current.positions,
-            colors: createSolidColors(particleCount, customManifestRef.current.color),
-          }
+          positions: customManifestRef.current.positions,
+          colors: createSolidColors(particleCount, customManifestRef.current.color),
+        }
         : buildPresetData(
-            activePresetRef.current,
-            particleCount,
-            PRESETS[activePresetRef.current].color,
-          );
+          activePresetRef.current,
+          particleCount,
+          PRESETS[activePresetRef.current].color,
+        );
     targetPositionsRef.current = initialPresetData.positions;
     targetColorsRef.current = initialPresetData.colors;
 
@@ -466,7 +468,7 @@ export default function AetherParticles() {
       }
 
       previewVideoRef.current.srcObject = hiddenVideoRef.current.srcObject;
-      previewVideoRef.current.play().catch(() => {});
+      previewVideoRef.current.play().catch(() => { });
     };
 
     const resize = () => {
@@ -603,6 +605,11 @@ export default function AetherParticles() {
         particles.rotation.x += (targetX - particles.rotation.x) * 0.08;
         particles.rotation.y += 0.002 * rotationDirectionRef.current.lotusUpperFull;
         particles.rotation.z += (0 - particles.rotation.z) * 0.08;
+      } else if (rotationMode === "supernovaFixed") {
+        const targetX = -1.05 - (Math.sin(time * 0.78 - Math.PI / 2) * 0.5 + 0.5) * 0.3375;
+        particles.rotation.x += (targetX - particles.rotation.x) * 0.08;
+        particles.rotation.y += (0 - particles.rotation.y) * 0.08;
+        particles.rotation.z += 0.0009 * rotationDirectionRef.current.supernovaFixed;
       } else if (rotationMode === "lotusSweep") {
         const targetX = -0.2 + Math.cos(time * 0.42) * 0.025;
         const targetY = (Math.sin(time * 0.42) * 0.5 + 0.5) * 1.12;
@@ -636,9 +643,8 @@ export default function AetherParticles() {
         particles.rotation.z += 0.0022;
       } else if (rotationMode === "galaxyTilt") {
         const targetX = 1.72 + Math.sin(time * 0.26125) * 0.62;
-        const targetY = Math.cos(time * 0.198) * 0.18;
         particles.rotation.x += (targetX - particles.rotation.x) * 0.08;
-        particles.rotation.y += (targetY - particles.rotation.y) * 0.08;
+        particles.rotation.y += 0.0009 * rotationDirectionRef.current.galaxyTilt;
         particles.rotation.z += (0 - particles.rotation.z) * 0.08;
       } else if (rotationMode === "saturnSide") {
         const targetX = 0.36 + Math.sin(time * 1.045) * 0.13;
@@ -753,7 +759,7 @@ export default function AetherParticles() {
       window.removeEventListener("resize", resize);
 
       if (handsRef.current) {
-        handsRef.current.close().catch(() => {});
+        handsRef.current.close().catch(() => { });
         handsRef.current = null;
       }
 
@@ -820,6 +826,10 @@ export default function AetherParticles() {
     customManifestRef.current = null;
     if (PRESETS[nextPreset]?.rotation === "lotusUpperFull") {
       rotationDirectionRef.current.lotusUpperFull = Math.random() < 0.5 ? -1 : 1;
+    } else if (PRESETS[nextPreset]?.rotation === "supernovaFixed") {
+      rotationDirectionRef.current.supernovaFixed = Math.random() < 0.5 ? -1 : 1;
+    } else if (PRESETS[nextPreset]?.rotation === "galaxyTilt") {
+      rotationDirectionRef.current.galaxyTilt = Math.random() < 0.5 ? -1 : 1;
     }
     setPreset(nextPreset);
     setParticleColor(PRESETS[nextPreset].color);
@@ -855,9 +865,8 @@ export default function AetherParticles() {
 
       {ENABLE_PRELOADER ? (
         <div
-          className={`${styles.preloader} ${
-            isPreloaderVisible ? styles.preloaderVisible : styles.preloaderHidden
-          }`}
+          className={`${styles.preloader} ${isPreloaderVisible ? styles.preloaderVisible : styles.preloaderHidden
+            }`}
           aria-hidden={!isPreloaderVisible}
         >
           <div className={styles.preloaderCard}>
@@ -1032,9 +1041,8 @@ export default function AetherParticles() {
 
       {/* Welcome guide shown on first load and reopened later through the help button. */}
       <div
-        className={`${styles.guideOverlay} ${
-          isGuideOpen ? styles.guideOverlayVisible : styles.guideOverlayHidden
-        }`}
+        className={`${styles.guideOverlay} ${isGuideOpen ? styles.guideOverlayVisible : styles.guideOverlayHidden
+          }`}
         aria-hidden={!isGuideOpen}
         onClick={closeGuide}
       >
@@ -1617,19 +1625,19 @@ function createSupernovaData(particleCount) {
     let radiusRatio;
 
     if (branch < 0.24) {
-        const radius = Math.pow(Math.random(), 1.85) * 1.9 * scale;
-        const angle = Math.random() * Math.PI * 2;
-        x = Math.cos(angle) * radius * 1.08 + (Math.random() - 0.5) * 0.16;
-        y = Math.sin(angle) * radius * 0.72 + (Math.random() - 0.5) * 0.14;
-        z = (Math.random() - 0.5) * 0.34;
+      const radius = Math.pow(Math.random(), 1.85) * 1.9 * scale;
+      const angle = Math.random() * Math.PI * 2;
+      x = Math.cos(angle) * radius * 1.08 + (Math.random() - 0.5) * 0.16;
+      y = Math.sin(angle) * radius * 0.72 + (Math.random() - 0.5) * 0.14;
+      z = (Math.random() - 0.5) * 0.34;
       radiusRatio = radius / 8.2;
       color.copy(coreColor).lerp(warmCoreColor, Math.random() * 0.45);
     } else if (branch < 0.68) {
-        const radius = lerp(0.7, 7.6, Math.pow(Math.random(), 0.62)) * scale;
-        const angle = Math.random() * Math.PI * 2;
-        x = Math.cos(angle) * radius * 1.42 + (Math.random() - 0.5) * 0.3;
-        y = Math.sin(angle) * radius * 0.82 + (Math.random() - 0.5) * 0.26;
-        z = (Math.random() - 0.5) * (0.18 + radius * 0.065);
+      const radius = lerp(0.7, 7.6, Math.pow(Math.random(), 0.62)) * scale;
+      const angle = Math.random() * Math.PI * 2;
+      x = Math.cos(angle) * radius * 1.42 + (Math.random() - 0.5) * 0.3;
+      y = Math.sin(angle) * radius * 0.82 + (Math.random() - 0.5) * 0.26;
+      z = (Math.random() - 0.5) * (0.18 + radius * 0.065);
       radiusRatio = radius / 8.2;
       color.copy(haloColor).lerp(armColor, radiusRatio * 0.7);
       if (Math.random() < 0.18) {
@@ -1637,10 +1645,10 @@ function createSupernovaData(particleCount) {
       }
     } else {
       const armIndex = Math.floor(Math.random() * 4);
-        const radius = lerp(0.9, 8.2, Math.pow(Math.random(), 0.55)) * scale;
-        const twist = radius * 0.88;
-        const angle =
-          (armIndex / 4) * Math.PI * 2 +
+      const radius = lerp(0.9, 8.2, Math.pow(Math.random(), 0.55)) * scale;
+      const twist = radius * 0.88;
+      const angle =
+        (armIndex / 4) * Math.PI * 2 +
         twist +
         (Math.random() - 0.5) * (0.14 + radius * 0.018);
       const width = (Math.random() - 0.5) * (0.2 + radius * 0.12);
