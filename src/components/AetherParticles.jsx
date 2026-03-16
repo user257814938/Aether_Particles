@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import handsPackage from "@mediapipe/hands";
 import styles from "./AetherParticles.module.css";
@@ -38,6 +38,16 @@ const DEFAULT_STATUS = {
   text: "Allow camera access to control the sculpture with your hand.",
 };
 const GUIDE_STORAGE_KEY = "aether-guide-dismissed";
+const DEFAULT_PRESET = "heart";
+
+function normalizePresetKey(value) {
+  if (!value) {
+    return null;
+  }
+
+  const normalizedValue = value.toLowerCase();
+  return Object.hasOwn(PRESETS, normalizedValue) ? normalizedValue : null;
+}
 
 export default function AetherParticles() {
   const panelRef = useRef(null);
@@ -53,12 +63,12 @@ export default function AetherParticles() {
   const handRequestInFlightRef = useRef(false);
   const currentExpansionRef = useRef(0.5);
   const targetExpansionRef = useRef(0.5);
-  const colorTargetRef = useRef(new THREE.Color(PRESETS.heart.color));
+  const colorTargetRef = useRef(new THREE.Color(PRESETS[DEFAULT_PRESET].color));
   const particleCountRef = useRef(0);
   const mountedRef = useRef(false);
-  const activePresetRef = useRef("heart");
-  const [preset, setPreset] = useState("heart");
-  const [particleColor, setParticleColor] = useState(PRESETS.heart.color);
+  const activePresetRef = useRef(DEFAULT_PRESET);
+  const [preset, setPreset] = useState(DEFAULT_PRESET);
+  const [particleColor, setParticleColor] = useState(PRESETS[DEFAULT_PRESET].color);
   const [status, setStatus] = useState(DEFAULT_STATUS);
   const [forceLevel, setForceLevel] = useState(0);
   const [cameraDockMetrics, setCameraDockMetrics] = useState({
@@ -85,6 +95,26 @@ export default function AetherParticles() {
       targetColorsRef.current = presetData.colors;
     }
   }, [preset]);
+
+  useLayoutEffect(() => {
+    const syncPresetFromUrl = () => {
+      const nextPreset =
+        normalizePresetKey(new URLSearchParams(window.location.search).get("preset")) ??
+        DEFAULT_PRESET;
+
+      setPreset(nextPreset);
+      setParticleColor(PRESETS[nextPreset].color);
+      activePresetRef.current = nextPreset;
+      colorTargetRef.current.set(PRESETS[nextPreset].color);
+    };
+
+    syncPresetFromUrl();
+    window.addEventListener("popstate", syncPresetFromUrl);
+
+    return () => {
+      window.removeEventListener("popstate", syncPresetFromUrl);
+    };
+  }, []);
 
   useEffect(() => {
     colorTargetRef.current.set(particleColor);
@@ -523,6 +553,18 @@ export default function AetherParticles() {
   const handlePresetChange = (nextPreset) => {
     setPreset(nextPreset);
     setParticleColor(PRESETS[nextPreset].color);
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set("preset", nextPreset);
+    window.history.replaceState({}, "", nextUrl);
+  };
+
+  const handleLogoReset = (event) => {
+    event.preventDefault();
+    setPreset(DEFAULT_PRESET);
+    setParticleColor(PRESETS[DEFAULT_PRESET].color);
+    activePresetRef.current = DEFAULT_PRESET;
+    colorTargetRef.current.set(PRESETS[DEFAULT_PRESET].color);
+    window.history.replaceState({}, "", window.location.pathname);
   };
 
   const forcePercent = Math.round(forceLevel * 100);
@@ -543,7 +585,12 @@ export default function AetherParticles() {
       <section ref={panelRef} className={styles.panel}>
         <div className={styles.panelHeader}>
           <div className={styles.brand}>
-            <a href="/" className={styles.logoLink} aria-label="Go to homepage">
+            <a
+              href="/"
+              className={styles.logoLink}
+              aria-label="Go to homepage"
+              onClick={handleLogoReset}
+            >
               <AetherLogo className={styles.logo} />
             </a>
             <div>
