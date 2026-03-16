@@ -97,7 +97,7 @@
   color: rgba(125, 211, 252, 0.84);
 }
 
-.panel {
+.leftRail {
   position: fixed;
   top: 24px;
   left: 24px;
@@ -107,7 +107,17 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding: 20px;
+}
+
+.panel {
+  position: relative;
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
   border-radius: 24px;
   color: #fff;
   background: transparent;
@@ -183,7 +193,7 @@
 
 .panelBody {
   display: grid;
-  gap: 16px;
+  gap: 12px;
 }
 
 .block {
@@ -195,12 +205,12 @@
 }
 
 .block:first-child {
-  margin-top: 10px;
+  margin-top: 6px;
 }
 
 .label {
   display: block;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.18em;
@@ -210,7 +220,7 @@
 
 .searchPanel {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .searchRow {
@@ -221,7 +231,7 @@
 
 .searchInput,
 .searchButton {
-  min-height: 44px;
+  min-height: 40px;
   border-radius: 14px;
   border: 2px solid rgba(125, 211, 252, 0.5);
   background: transparent;
@@ -233,8 +243,8 @@
 
 .searchInput {
   width: 100%;
-  padding: 0 14px;
-  font-size: 13px;
+  padding: 0 12px;
+  font-size: 12px;
   outline: none;
   transition:
     border-color 160ms ease,
@@ -254,7 +264,7 @@
 
 .searchButton {
   min-width: 50px;
-  padding: 0 14px;
+  padding: 0 12px;
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -286,18 +296,18 @@
 /* Preset chooser follows the custom storytelling order defined in the component. */
 .presetGrid {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .presetGroup {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .presetSection {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 7px;
 }
 
 .presetDivider {
@@ -322,7 +332,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 9px;
+  padding: 8px 8px;
   border: 2px solid rgba(125, 211, 252, 0.5);
   border-radius: 14px;
   background: transparent;
@@ -380,7 +390,7 @@
 
 .presetLabel {
   min-width: 0;
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.1;
   display: flex;
   align-items: center;
@@ -388,7 +398,7 @@
 
 .colorCard,
 .sidebarMeter {
-  padding: 14px;
+  padding: 12px;
   border-radius: 16px;
   background: transparent;
   border: 2px solid rgba(125, 211, 252, 0.3);
@@ -408,15 +418,15 @@
   display: grid;
   grid-template-columns: auto 1fr;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   min-height: 0;
-  padding: 12px 14px;
+  padding: 10px 12px;
   cursor: pointer;
 }
 
 .colorPreview {
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   flex-shrink: 0;
   border-radius: 14px;
   background:
@@ -433,7 +443,7 @@
 
 .colorValue {
   margin: 0;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
   letter-spacing: 0.06em;
   color: #ffffff;
@@ -456,7 +466,7 @@
 
 .sidebarMeter {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .hiddenVideo {
@@ -525,8 +535,9 @@
 }
 
 .cameraDock {
-  position: fixed;
-  z-index: 2;
+  position: relative;
+  width: 100%;
+  flex: 0 0 auto;
 }
 
 .previewVideo {
@@ -549,7 +560,7 @@
   justify-content: space-between;
   gap: 12px;
   width: 100%;
-  padding: 11px 15px;
+  padding: 10px 14px;
   border: 2px solid rgba(125, 211, 252, 0.5);
   border-radius: 16px;
   background:
@@ -577,6 +588,7 @@
 .helpButtonText {
   text-align: left;
   order: 1;
+  font-size: 13px;
 }
 
 .helpButtonIcon {
@@ -741,18 +753,20 @@
 
 
 @media (max-width: 768px) {
-  .panel {
+  .leftRail {
     top: 16px;
     left: 16px;
     right: 16px;
     width: auto;
     max-height: calc(100vh - 32px);
+  }
+
+  .panel {
     padding: 18px;
   }
 
   .cameraDock {
-    left: 16px !important;
-    width: calc(100vw - 32px) !important;
+    width: 100%;
   }
 
   .guideOverlay {
