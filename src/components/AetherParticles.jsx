@@ -16,7 +16,7 @@ const PRESETS = {
   heart: { label: "Heart", color: "#dc2626", icon: "\u2665", rotation: "heartDrift" },
   saturn: { label: "Saturn", color: "#caa46b", icon: "\u{1FA90}", rotation: "side" },
   buddha: { label: "Buddha", color: "#b7791f", icon: "\u2638", rotation: "heartDrift" },
-  flower: { label: "Flower", color: "#e11d48", icon: "\u273F", rotation: "lotusSweep" },
+  flower: { label: "Flower", color: "#e11d48", icon: "\u273F", rotation: "heartDrift" },
   lotus: { label: "Lotus", color: "#ec4899", icon: "\u{1FAB7}", rotation: "lotusSweep" },
   fireworks: { label: "Fireworks", color: "#b91c1c", icon: "\u2726", rotation: "full" },
   supernova: { label: "Supernova", color: "#8b5cf6", icon: "\u273A", rotation: "galaxyTilt" },
@@ -1444,6 +1444,7 @@ function createSaturnPositions(particleCount) {
 // Front-facing polar flower based on a rose curve for a clean face-on silhouette.
 function createFlowerPositions(particleCount) {
   const targetPositions = new Float32Array(particleCount * 3);
+  const scale = 2.25 * 1.5;
 
   for (let index = 0; index < particleCount; index += 1) {
     const offset = index * 3;
@@ -1451,8 +1452,8 @@ function createFlowerPositions(particleCount) {
     const radius = 2 * Math.cos(5 * phi) + 1;
     const fill = lerp(0.35, 1, Math.sqrt(Math.random()));
 
-    targetPositions[offset] = radius * fill * Math.cos(phi) * 2.25;
-    targetPositions[offset + 1] = radius * fill * Math.sin(phi) * 2.25;
+    targetPositions[offset] = radius * fill * Math.cos(phi) * scale;
+    targetPositions[offset + 1] = radius * fill * Math.sin(phi) * scale;
     targetPositions[offset + 2] = (Math.random() - 0.5) * 0.75;
   }
 
