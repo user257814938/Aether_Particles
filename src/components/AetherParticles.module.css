@@ -22,63 +22,72 @@
   top: 24px;
   left: 24px;
   z-index: 2;
-  width: min(320px, calc(100vw - 32px));
-  padding: 24px;
+  width: min(332px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
   border-radius: 24px;
   color: #fff;
-  background: rgba(15, 15, 15, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  border: 2px solid rgba(125, 211, 252, 0.62);
   backdrop-filter: blur(16px);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.42),
+    0 0 34px rgba(96, 165, 250, 0.12),
+    inset 0 0 0 1px rgba(244, 114, 182, 0.14);
+  overflow: auto;
 }
 
 .panelHeader {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
   gap: 14px;
 }
 
-.helpButton {
+.brand {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.logoLink {
+  display: inline-flex;
   flex-shrink: 0;
-  padding: 9px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
-  color: #ffffff;
-  cursor: pointer;
-  transition:
-    transform 160ms ease,
-    border-color 160ms ease,
-    background 160ms ease;
 }
 
-.helpButton:hover {
-  transform: translateY(-2px);
-  border-color: rgba(96, 165, 250, 0.78);
-  background: rgba(59, 130, 246, 0.16);
-}
-
-.kicker {
-  margin: 0 0 4px;
-  font-size: 11px;
-  letter-spacing: 0.26em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.48);
+.logo {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  margin-top: -4px;
 }
 
 .title {
-  margin: 0;
+  margin: 0 0 4px;
   font-size: 28px;
   line-height: 1;
-  background: linear-gradient(90deg, #60a5fa, #c084fc);
+  text-transform: lowercase;
+  background: linear-gradient(90deg, #b9d5ff, #72c7ff 42%, #f6d0ff 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
+.description {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.64);
+}
+
 .status {
-  margin: 14px 0 0;
+  margin: -4px 0 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(127, 29, 29, 0.18);
+  border: 1px solid rgba(248, 113, 113, 0.16);
   font-size: 13px;
   line-height: 1.5;
   color: rgba(255, 255, 255, 0.72);
@@ -92,13 +101,26 @@
   color: #bfdbfe;
 }
 
+.panelBody {
+  display: grid;
+  gap: 16px;
+}
+
 .block {
-  margin-top: 24px;
+  margin-top: 0;
+}
+
+.guideBlock {
+  margin-top: 0;
+}
+
+.block:first-child {
+  margin-top: 10px;
 }
 
 .label {
   display: block;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.18em;
@@ -112,30 +134,29 @@
   gap: 12px;
 }
 
-.presetSection {
-  position: relative;
+.presetGroup {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
-  padding-bottom: 12px;
 }
 
-.presetSection::after {
-  content: "";
-  position: absolute;
-  right: 2px;
-  bottom: 0;
-  left: 2px;
-  height: 2px;
-  /* Reuse the luminous divider motif under every preset section for consistent grouping. */
+.presetSection {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.presetDivider {
+  margin: 0 2px;
+  height: 6px;
   background: linear-gradient(
     90deg,
     rgba(255, 255, 255, 0),
-    rgba(96, 165, 250, 0.14) 16%,
-    rgba(255, 255, 255, 0.72) 50%,
-    rgba(96, 165, 250, 0.14) 84%,
+    rgba(96, 165, 250, 0.18) 16%,
+    rgba(255, 255, 255, 0.8) 50%,
+    rgba(96, 165, 250, 0.18) 84%,
     rgba(255, 255, 255, 0)
   );
+  clip-path: polygon(0 50%, 12% 38%, 50% 0, 88% 38%, 100% 50%, 88% 62%, 50% 100%, 12% 62%);
   border-radius: 999px;
   box-shadow:
     0 0 10px rgba(255, 255, 255, 0.16),
@@ -145,185 +166,275 @@
 .presetButton {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 12px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  gap: 8px;
+  padding: 10px 9px;
+  border: 2px solid rgba(125, 211, 252, 0.5);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.04);
+  background: transparent;
   color: #fff;
   cursor: pointer;
   transition:
     transform 160ms ease,
     border-color 160ms ease,
-    background 160ms ease;
+    background 160ms ease,
+    box-shadow 160ms ease;
   text-align: left;
+  box-shadow:
+    inset 0 0 0 1px rgba(244, 114, 182, 0.08),
+    0 0 0 rgba(0, 0, 0, 0);
 }
 
 .presetButton:hover {
   transform: translateY(-2px);
-  border-color: rgba(96, 165, 250, 0.7);
-  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(125, 211, 252, 0.82);
+  background: transparent;
+  box-shadow:
+    inset 0 0 0 1px rgba(244, 114, 182, 0.18),
+    0 0 18px rgba(96, 165, 250, 0.18);
 }
 
 .presetButton[data-active="true"] {
-  border-color: rgba(96, 165, 250, 0.84);
-  background: rgba(59, 130, 246, 0.22);
+  border-width: 3px;
+  border-color: var(--active-preset-color, rgba(186, 230, 253, 0.98));
+  background: transparent;
+  color: var(--active-preset-color, #dbeafe);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--active-preset-color, #dbeafe) 32%, white),
+    0 0 28px color-mix(in srgb, var(--active-preset-color, #dbeafe) 26%, transparent);
+}
+
+.presetButton[data-active="true"] .presetIcon {
+  color: var(--active-preset-color, #f0f9ff);
+}
+
+.presetButton[data-active="true"] .presetLabel {
+  color: var(--active-preset-color, #f0f9ff);
 }
 
 .presetIcon {
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
   flex-shrink: 0;
   font-size: 15px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
+  line-height: 1;
+  transform: translateY(-1px);
 }
 
 .presetLabel {
   min-width: 0;
+  font-size: 13px;
+  line-height: 1.1;
+  display: flex;
+  align-items: center;
 }
 
-.colorInput {
-  width: 100%;
-  height: 44px;
-  padding: 0;
-  border: 0;
-  border-radius: 12px;
+.colorCard,
+.sidebarMeter {
+  padding: 14px;
+  border-radius: 16px;
   background: transparent;
+  border: 2px solid rgba(125, 211, 252, 0.3);
+}
+
+.colorCard {
+  display: block;
+  padding: 0;
+  border-color: rgba(125, 211, 252, 0.62);
+  box-shadow:
+    0 0 34px rgba(96, 165, 250, 0.12),
+    inset 0 0 0 1px rgba(244, 114, 182, 0.14);
+}
+
+.colorControl {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 12px;
+  min-height: 0;
+  padding: 12px 14px;
   cursor: pointer;
 }
 
-.instructions {
-  margin-top: 24px;
-  padding: 14px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.82);
-  font-size: 13px;
-  line-height: 1.45;
+.colorPreview {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.42), transparent 34%),
+    var(--preview-color);
+  border: 1px solid rgba(255, 255, 255, 0.16);
 }
 
-.instructions p {
+.colorMeta {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.colorValue {
   margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #ffffff;
+  line-height: 1;
+  transform: translateY(-1px);
 }
 
-.instructions p + p {
-  margin-top: 8px;
+.colorInput {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+}
+
+.sidebarMeter {
+  display: grid;
+  gap: 8px;
 }
 
 .hiddenVideo {
   display: none;
 }
 
-/* Dock anchored bottom-left for the moved camera preview and live force gauge. */
-.bottomDock {
-  position: fixed;
-  left: 24px;
-  bottom: 24px;
-  z-index: 2;
-  display: grid;
-  gap: 14px;
-  width: min(320px, calc(100vw - 32px));
-}
-
-.forceCard,
-.cameraCard {
-  padding: 16px;
-  border-radius: 20px;
-  background: rgba(15, 15, 15, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(16px);
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
-}
-
-.forceHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.forceTitle,
-.cameraLabel {
-  margin: 0;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.46);
-}
-
-.forceValue {
-  font-size: 15px;
-  font-weight: 700;
-  color: #ffffff;
-}
-
 .forceMeter {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: 12px;
-  margin-top: 14px;
+  gap: 8px;
 }
 
 .forceIcon {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  font-size: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  font-size: 16px;
+  line-height: 1;
 }
 
 .forceTrack {
   position: relative;
-  height: 14px;
-  border-radius: 999px;
+  height: 3px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  border-radius: 999px;
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .forceFill {
   position: absolute;
-  inset: 0 auto 0 0;
-  border-radius: inherit;
+  top: 50%;
+  left: 0;
+  height: 10px;
   background: linear-gradient(90deg, #334155 0%, #3b82f6 50%, #7dd3fc 100%);
-  box-shadow: 0 0 22px rgba(59, 130, 246, 0.45);
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.22);
+  clip-path: polygon(0 50%, 12% 36%, 50% 0, 88% 36%, 100% 50%, 88% 64%, 50% 100%, 12% 64%);
+  transform: translateY(-50%);
 }
 
 .forceThumb {
   position: absolute;
   top: 50%;
-  width: 20px;
-  height: 20px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   background: #ffffff;
-  border: 2px solid rgba(59, 130, 246, 0.85);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.28);
+  border: 1.5px solid rgba(59, 130, 246, 0.85);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
   transform: translate(-50%, -50%);
 }
 
-.cameraLabel {
-  display: block;
-  margin-bottom: 12px;
+.cameraWrap {
+  overflow: hidden;
+  border-radius: 18px;
+  border: 2px solid rgba(125, 211, 252, 0.62);
+  box-sizing: border-box;
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.42),
+    0 0 34px rgba(96, 165, 250, 0.12),
+    inset 0 0 0 1px rgba(244, 114, 182, 0.14);
+  width: 100%;
+}
+
+.cameraDock {
+  position: fixed;
+  z-index: 2;
 }
 
 .previewVideo {
+  display: block;
   position: static;
   width: 100%;
   aspect-ratio: 4 / 3;
   object-fit: cover;
   transform: scaleX(-1);
   border-radius: 16px;
-  border: 2px solid rgba(59, 130, 246, 0.85);
-  background: rgba(255, 255, 255, 0.04);
+  border: 0;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.helpButton {
+  position: relative;
+  margin-top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 11px 15px;
+  border: 2px solid rgba(125, 211, 252, 0.5);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at top right, rgba(59, 130, 246, 0.18), transparent 24%),
+    rgba(12, 16, 28, 0.96);
+  color: #ffffff;
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.helpButton:hover {
+  transform: translateY(-2px);
+  border-color: rgba(125, 211, 252, 0.82);
+  background:
+    radial-gradient(circle at top right, rgba(59, 130, 246, 0.22), transparent 24%),
+    rgba(12, 16, 28, 0.98);
+  box-shadow:
+    inset 0 0 0 1px rgba(244, 114, 182, 0.18),
+    0 0 18px rgba(96, 165, 250, 0.18);
+}
+
+.helpButtonText {
+  text-align: left;
+  order: 1;
+}
+
+.helpButtonIcon {
+  order: 2;
+  width: 18px;
+  font-size: 0;
+  line-height: 1;
+}
+
+.helpButtonIcon::before {
+  content: "\2197";
+  font-size: 18px;
+  line-height: 1;
 }
 
 /* First-run onboarding overlay that can be reopened from the left panel help button. */
@@ -396,10 +507,7 @@
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 14px;
-  padding: 14px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 4px 0;
 }
 
 .guideStepNumber {
@@ -439,19 +547,18 @@
 }
 
 .guideLegendIcon {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
   flex-shrink: 0;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 22px;
 }
 
 .guideActions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
   margin-top: 24px;
 }
 
@@ -483,14 +590,13 @@
     left: 16px;
     right: 16px;
     width: auto;
+    max-height: calc(100vh - 32px);
     padding: 18px;
   }
 
-  .bottomDock {
-    left: 16px;
-    right: 16px;
-    bottom: 16px;
-    width: auto;
+  .cameraDock {
+    left: 16px !important;
+    width: calc(100vw - 32px) !important;
   }
 
   .guideOverlay {

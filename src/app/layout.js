@@ -2,8 +2,8 @@ import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
 
 export const metadata = {
-  title: "Aether Particles",
-  description: "Experience de particules 3D controlee par les mains avec Three.js et MediaPipe.",
+  title: "aether",
+  description: "Sculpture particulaire reactive au geste avec Three.js et MediaPipe.",
 };
 
 export default function RootLayout({ children }) {

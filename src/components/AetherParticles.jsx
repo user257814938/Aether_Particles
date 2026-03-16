@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import handsPackage from "@mediapipe/hands";
 import styles from "./AetherParticles.module.css";
@@ -13,15 +13,15 @@ const { Hands } = handsPackage;
 // - `rotation` decides whether the shape can tilt vertically or should stay front-facing
 const PRESETS = {
   sphere: { label: "Sphere", color: "#2563eb", icon: "\u25CF", rotation: "full" },
-  heart: { label: "Heart", color: "#dc2626", icon: "\u2665", rotation: "front" },
-  saturn: { label: "Saturn", color: "#caa46b", icon: "\u{1FA90}", rotation: "horizontal" },
-  buddha: { label: "Buddha", color: "#b7791f", icon: "\u2638", rotation: "front" },
-  flower: { label: "Flower", color: "#e11d48", icon: "\u273F", rotation: "front" },
-  lotus: { label: "Lotus", color: "#ec4899", icon: "\u{1FAB7}", rotation: "front" },
-  fireworks: { label: "Fireworks", color: "#f97316", icon: "\u2726", rotation: "front" },
-  supernova: { label: "Supernova", color: "#8b5cf6", icon: "\u273A", rotation: "front" },
+  heart: { label: "Heart", color: "#dc2626", icon: "\u2665", rotation: "drift" },
+  saturn: { label: "Saturn", color: "#caa46b", icon: "\u{1FA90}", rotation: "side" },
+  buddha: { label: "Buddha", color: "#b7791f", icon: "\u2638", rotation: "drift" },
+  flower: { label: "Flower", color: "#e11d48", icon: "\u273F", rotation: "lotusSweep" },
+  lotus: { label: "Lotus", color: "#ec4899", icon: "\u{1FAB7}", rotation: "lotusSweep" },
+  fireworks: { label: "Fireworks", color: "#b91c1c", icon: "\u2726", rotation: "full" },
+  supernova: { label: "Supernova", color: "#8b5cf6", icon: "\u273A", rotation: "galaxyTilt" },
   cube: { label: "Cube", color: "#14b8a6", icon: "\u25A3", rotation: "full" },
-  square: { label: "Square", color: "#d97706", icon: "\u25A0", rotation: "front" },
+  square: { label: "Square", color: "#d97706", icon: "\u25A0", rotation: "drift" },
 };
 
 const PRESET_SECTIONS = [
@@ -35,31 +35,39 @@ const PRESET_SECTIONS = [
 const DEFAULT_STATUS = {
   id: "boot",
   tone: "neutral",
-  text: "Autorise la camera pour piloter la sculpture avec ta main.",
+  text: "Allow camera access to control the sculpture with your hand.",
 };
+const GUIDE_STORAGE_KEY = "aether-guide-dismissed";
 
 export default function AetherParticles() {
+  const panelRef = useRef(null);
   const canvasRef = useRef(null);
   const hiddenVideoRef = useRef(null);
   const previewVideoRef = useRef(null);
   const animationFrameRef = useRef(0);
   const targetPositionsRef = useRef(new Float32Array());
+  const targetColorsRef = useRef(new Float32Array());
   const handsRef = useRef(null);
   const mediaStreamRef = useRef(null);
   const lastVideoTimeRef = useRef(-1);
   const handRequestInFlightRef = useRef(false);
   const currentExpansionRef = useRef(0.5);
   const targetExpansionRef = useRef(0.5);
-  const colorTargetRef = useRef(new THREE.Color(PRESETS.sphere.color));
+  const colorTargetRef = useRef(new THREE.Color(PRESETS.heart.color));
   const particleCountRef = useRef(0);
   const mountedRef = useRef(false);
-  const activePresetRef = useRef("sphere");
-  const [preset, setPreset] = useState("sphere");
-  const [particleColor, setParticleColor] = useState(PRESETS.sphere.color);
+  const activePresetRef = useRef("heart");
+  const [preset, setPreset] = useState("heart");
+  const [particleColor, setParticleColor] = useState(PRESETS.heart.color);
   const [status, setStatus] = useState(DEFAULT_STATUS);
   const [forceLevel, setForceLevel] = useState(0);
-  // The onboarding guide opens by default, then becomes user-controlled via the left panel.
-  const [isGuideOpen, setIsGuideOpen] = useState(true);
+  const [cameraDockMetrics, setCameraDockMetrics] = useState({
+    left: 24,
+    top: 24,
+    width: 356,
+  });
+  // The onboarding guide opens only on the first visit, then remains user-controlled via the left panel.
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
 
   const presetSections = PRESET_SECTIONS.map((section) =>
     section.map((key) => [key, PRESETS[key]]),
@@ -68,18 +76,31 @@ export default function AetherParticles() {
   useEffect(() => {
     activePresetRef.current = preset;
     if (particleCountRef.current > 0) {
-      targetPositionsRef.current = buildPresetPositions(preset, particleCountRef.current);
+      const presetData = buildPresetData(
+        preset,
+        particleCountRef.current,
+        PRESETS[preset].color,
+      );
+      targetPositionsRef.current = presetData.positions;
+      targetColorsRef.current = presetData.colors;
     }
   }, [preset]);
 
   useEffect(() => {
     colorTargetRef.current.set(particleColor);
+    if (particleCountRef.current > 0 && activePresetRef.current !== "supernova") {
+      targetColorsRef.current = buildPresetColors(
+        activePresetRef.current,
+        particleCountRef.current,
+        particleColor,
+      );
+    }
   }, [particleColor]);
 
   useEffect(() => {
     const handleKeyDown = (event) => {
       if (event.key === "Escape") {
-        setIsGuideOpen(false);
+        closeGuide();
       }
     };
 
@@ -88,6 +109,58 @@ export default function AetherParticles() {
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
+
+  useEffect(() => {
+    try {
+      const hasDismissedGuide = window.localStorage.getItem(GUIDE_STORAGE_KEY) === "true";
+      setIsGuideOpen(!hasDismissedGuide);
+    } catch {
+      setIsGuideOpen(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!panelRef.current) {
+      return undefined;
+    }
+
+    const updateMetrics = () => {
+      const panel = panelRef.current;
+
+      if (!panel) {
+        return;
+      }
+
+      const rect = panel.getBoundingClientRect();
+      setCameraDockMetrics({
+        left: rect.left,
+        top: rect.bottom + 16,
+        width: rect.width,
+      });
+    };
+
+    updateMetrics();
+
+    const resizeObserver = new ResizeObserver(() => {
+      updateMetrics();
+    });
+
+    resizeObserver.observe(panelRef.current);
+    window.addEventListener("resize", updateMetrics);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", updateMetrics);
+    };
+  }, []);
+
+  const closeGuide = () => {
+    setIsGuideOpen(false);
+
+    try {
+      window.localStorage.setItem(GUIDE_STORAGE_KEY, "true");
+    } catch {}
+  };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -113,16 +186,19 @@ export default function AetherParticles() {
 
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(particleCount * 3);
+    const colors = createSolidColors(particleCount, PRESETS.heart.color);
 
     for (let index = 0; index < positions.length; index += 1) {
       positions[index] = (Math.random() - 0.5) * 20;
     }
 
     geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
 
     const material = new THREE.PointsMaterial({
       size: 0.05,
-      color: PRESETS.sphere.color,
+      color: "#ffffff",
+      vertexColors: true,
       transparent: true,
       opacity: 0.8,
       depthWrite: false,
@@ -132,7 +208,13 @@ export default function AetherParticles() {
     const particles = new THREE.Points(geometry, material);
     scene.add(particles);
 
-    targetPositionsRef.current = buildPresetPositions(activePresetRef.current, particleCount);
+    const initialPresetData = buildPresetData(
+      activePresetRef.current,
+      particleCount,
+      PRESETS[activePresetRef.current].color,
+    );
+    targetPositionsRef.current = initialPresetData.positions;
+    targetColorsRef.current = initialPresetData.colors;
 
     const updateStatus = (nextStatus) => {
       if (!mountedRef.current) {
@@ -204,7 +286,7 @@ export default function AetherParticles() {
         updateStatus({
           id: "tracking",
           tone: "ready",
-          text: "Tracking actif: main ouverte pour etendre, poing ferme pour regrouper.",
+          text: "Tracking active: open your hand to expand, close it to gather.",
         });
         return;
       }
@@ -214,7 +296,7 @@ export default function AetherParticles() {
       updateStatus({
         id: "idle",
         tone: "neutral",
-        text: "Camera active. Place ta main dans le cadre pour reprendre le controle.",
+        text: "Camera active. Place your hand in frame to resume control.",
       });
     };
 
@@ -235,7 +317,7 @@ export default function AetherParticles() {
             updateStatus({
               id: "tracking-error",
               tone: "error",
-              text: "Le suivi de main a echoue dans cette session. Recharge la page pour reessayer.",
+              text: "Hand tracking failed in this session. Reload the page to try again.",
             });
           })
           .finally(() => {
@@ -244,10 +326,11 @@ export default function AetherParticles() {
       }
 
       const positionAttribute = geometry.attributes.position;
+      const colorAttribute = geometry.attributes.color;
       const targetPositions = targetPositionsRef.current;
+      const targetColors = targetColorsRef.current;
       currentExpansionRef.current +=
         (targetExpansionRef.current - currentExpansionRef.current) * 0.1;
-      material.color.lerp(colorTargetRef.current, 0.05);
 
       for (let index = 0; index < particleCount; index += 1) {
         const offset = index * 3;
@@ -260,23 +343,89 @@ export default function AetherParticles() {
           (targetY - positionAttribute.array[offset + 1]) * 0.05;
         positionAttribute.array[offset + 2] +=
           (targetZ - positionAttribute.array[offset + 2]) * 0.05;
+
+        colorAttribute.array[offset] += (targetColors[offset] - colorAttribute.array[offset]) * 0.08;
+        colorAttribute.array[offset + 1] +=
+          (targetColors[offset + 1] - colorAttribute.array[offset + 1]) * 0.08;
+        colorAttribute.array[offset + 2] +=
+          (targetColors[offset + 2] - colorAttribute.array[offset + 2]) * 0.08;
       }
 
       positionAttribute.needsUpdate = true;
+      colorAttribute.needsUpdate = true;
       // Silhouettes stay readable from the front, horizontal models orbit sideways, volumetric objects spin freely.
       const rotationMode = PRESETS[activePresetRef.current].rotation;
+      const time = performance.now() * 0.001;
+
       if (rotationMode === "full") {
         particles.rotation.y += 0.002;
         particles.rotation.x += 0.001;
-      } else if (rotationMode === "horizontal") {
-        particles.rotation.y += 0.002;
-        particles.rotation.x += (0 - particles.rotation.x) * 0.08;
+        particles.rotation.z += (0 - particles.rotation.z) * 0.08;
+      } else if (rotationMode === "lotusSweep") {
+        const targetX = -0.2 + Math.cos(time * 0.42) * 0.025;
+        const targetY = (Math.sin(time * 0.42) * 0.5 + 0.5) * 1.12;
+        particles.rotation.x += (targetX - particles.rotation.x) * 0.08;
+        particles.rotation.y += (targetY - particles.rotation.y) * 0.08;
+        particles.rotation.z += (0 - particles.rotation.z) * 0.08;
+      } else if (rotationMode === "drift") {
+        const targetX = Math.sin(time * 0.95) * 0.13;
+        const targetY = Math.cos(time * 0.72) * 0.22;
+        particles.rotation.x += (targetX - particles.rotation.x) * 0.08;
+        particles.rotation.y += (targetY - particles.rotation.y) * 0.08;
+        particles.rotation.z += (0 - particles.rotation.z) * 0.08;
+      } else if (rotationMode === "bloom") {
+        const targetX = Math.sin(time * 0.8) * 0.15;
+        const targetY = Math.cos(time * 0.64) * 0.18;
+        particles.rotation.x += (targetX - particles.rotation.x) * 0.08;
+        particles.rotation.y += (targetY - particles.rotation.y) * 0.08;
+        particles.rotation.z += 0.0025;
+      } else if (rotationMode === "bloomFront") {
+        const targetX = Math.sin(time * 0.74) * 0.08;
+        const targetY = Math.cos(time * 0.58) * 0.1;
+        particles.rotation.x += (targetX - particles.rotation.x) * 0.08;
+        particles.rotation.y += (targetY - particles.rotation.y) * 0.08;
+        particles.rotation.z += 0.0022;
+      } else if (rotationMode === "galaxyTilt") {
+        const targetX = 1.72 + Math.sin(time * 0.56) * 0.62;
+        const targetY = Math.cos(time * 0.44) * 0.18;
+        particles.rotation.x += (targetX - particles.rotation.x) * 0.08;
+        particles.rotation.y += (targetY - particles.rotation.y) * 0.08;
+        particles.rotation.z += (0 - particles.rotation.z) * 0.08;
+      } else if (rotationMode === "side") {
+        const targetX = 0.36 + Math.sin(time * 0.9) * 0.13;
+        const targetY = 0.82 + Math.cos(time * 0.52) * 0.08;
+        particles.rotation.x += (targetX - particles.rotation.x) * 0.08;
+        particles.rotation.y += (targetY - particles.rotation.y) * 0.08;
+        particles.rotation.z += (0 - particles.rotation.z) * 0.08;
       } else {
         particles.rotation.y += (0 - particles.rotation.y) * 0.08;
         particles.rotation.x += (0 - particles.rotation.x) * 0.08;
+        particles.rotation.z += (0 - particles.rotation.z) * 0.08;
       }
 
       renderer.render(scene, camera);
+    };
+
+    const requestCameraStream = async () => {
+      try {
+        return await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: "user",
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+          },
+          audio: false,
+        });
+      } catch (error) {
+        if (error?.name === "OverconstrainedError") {
+          return navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false,
+          });
+        }
+
+        throw error;
+      }
     };
 
     const boot = async () => {
@@ -297,14 +446,7 @@ export default function AetherParticles() {
         hands.onResults(handleResults);
         handsRef.current = hands;
 
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: "user",
-            width: { ideal: 640 },
-            height: { ideal: 480 },
-          },
-          audio: false,
-        });
+        const stream = await requestCameraStream();
 
         mediaStreamRef.current = stream;
         hiddenVideo.srcObject = stream;
@@ -316,16 +458,33 @@ export default function AetherParticles() {
         updateStatus({
           id: "camera-ready",
           tone: "ready",
-          text: "Camera connectee. Ouvre la main pour disperser les particules.",
+          text: "Camera connected. Open your hand to spread the particles.",
         });
         updateForceLevel(0);
       } catch (error) {
-        console.error(error);
         updateForceLevel(0);
+
+        const cameraMessageByError = {
+          NotAllowedError:
+            "Camera access denied. Allow the camera in your browser to enable gesture control.",
+          NotReadableError:
+            "The camera is already in use by another application or unavailable. Close the other app and reload the page.",
+          NotFoundError:
+            "No camera detected on this device. The preset remains visible, but gesture control is unavailable.",
+          AbortError:
+            "Camera startup was interrupted. Reload the page to try again.",
+        };
+
+        if (!cameraMessageByError[error?.name]) {
+          console.error(error);
+        }
+
         updateStatus({
           id: "camera-error",
           tone: "error",
-          text: "Acces camera refuse ou indisponible. Le preset reste visible, mais sans controle gestuel.",
+          text:
+            cameraMessageByError[error?.name] ??
+            "Camera access was denied or is unavailable. The preset remains visible, but gesture control is unavailable.",
         });
       }
     };
@@ -367,132 +526,165 @@ export default function AetherParticles() {
   };
 
   const forcePercent = Math.round(forceLevel * 100);
+  const showStatusNote = status.tone === "error";
+  const cameraDockStyle = useMemo(
+    () => ({
+      left: `${cameraDockMetrics.left}px`,
+      top: `${cameraDockMetrics.top}px`,
+      width: `${cameraDockMetrics.width}px`,
+    }),
+    [cameraDockMetrics],
+  );
 
   return (
     <main className={styles.page}>
       <canvas ref={canvasRef} className={styles.canvas} />
 
-      <section className={styles.panel}>
+      <section ref={panelRef} className={styles.panel}>
         <div className={styles.panelHeader}>
-          <div>
-            <p className={styles.kicker}>Hand Gesture Lab</p>
-            <h1 className={styles.title}>Aether Particles</h1>
+          <div className={styles.brand}>
+            <a href="/" className={styles.logoLink} aria-label="Go to homepage">
+              <AetherLogo className={styles.logo} />
+            </a>
+            <div>
+              <h1 className={styles.title}>aether</h1>
+              <p className={styles.description}>Gesture-reactive particle sculpture</p>
+            </div>
           </div>
-
-          <button
-            type="button"
-            className={styles.helpButton}
-            onClick={() => setIsGuideOpen(true)}
-          >
-            Aide ?
-          </button>
         </div>
 
-        <p className={styles.status} data-tone={status.tone}>
-          {status.text}
-        </p>
+        {showStatusNote ? (
+          <p className={styles.status} data-tone={status.tone}>
+            {status.text}
+          </p>
+        ) : null}
 
-        <div className={styles.block}>
-          <span className={styles.label}>Shape Template</span>
-          <div className={styles.presetGrid}>
-            {presetSections.map((section, sectionIndex) => (
-              <div key={`section-${sectionIndex}`} className={styles.presetSection}>
-                {section.map(([key, value]) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => handlePresetChange(key)}
-                    className={styles.presetButton}
-                    data-active={preset === key}
-                  >
-                    <span className={styles.presetIcon} aria-hidden="true">
-                      {value.icon}
-                    </span>
-                    <span className={styles.presetLabel}>{value.label}</span>
-                  </button>
-                ))}
+        <div className={styles.panelBody}>
+          <div className={styles.block}>
+            <span className={styles.label}>Shape Template</span>
+            <div className={styles.presetGrid}>
+              {presetSections.map((section, sectionIndex) => (
+                <div key={`section-${sectionIndex}`} className={styles.presetGroup}>
+                  <div className={styles.presetSection}>
+                    {section.map(([key, value]) => (
+                      <button
+                        key={key}
+                        type="button"
+                      onClick={() => handlePresetChange(key)}
+                      className={styles.presetButton}
+                      data-active={preset === key}
+                      style={
+                        preset === key
+                          ? { "--active-preset-color": value.color }
+                          : undefined
+                      }
+                    >
+                        <span className={styles.presetIcon} aria-hidden="true">
+                          {value.icon}
+                        </span>
+                        <span className={styles.presetLabel}>{value.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <div className={styles.presetDivider} aria-hidden="true" />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className={styles.block}>
+            <label htmlFor="particle-color" className={styles.label}>
+              Custom Tools
+            </label>
+            <div className={styles.colorCard}>
+              <label htmlFor="particle-color" className={styles.colorControl}>
+                <span
+                  className={styles.colorPreview}
+                  style={{ "--preview-color": particleColor }}
+                />
+                <span className={styles.colorMeta}>
+                  <span className={styles.colorValue}>{particleColor.toUpperCase()}</span>
+                </span>
+                <input
+                  id="particle-color"
+                  type="color"
+                  value={particleColor}
+                  onChange={(event) => setParticleColor(event.target.value)}
+                  className={styles.colorInput}
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className={styles.block}>
+            <span className={styles.label}>Meter</span>
+            <div className={styles.sidebarMeter}>
+              <div className={styles.forceMeter}>
+                <span className={styles.forceIcon} aria-hidden="true">
+                  {"\u270A"}
+                </span>
+
+                <div className={styles.forceTrack} aria-label="Hand openness force meter">
+                  <div className={styles.forceFill} style={{ width: `${forcePercent}%` }} />
+                  <div className={styles.forceThumb} style={{ left: `${forcePercent}%` }} />
+                </div>
+
+                <span className={styles.forceIcon} aria-hidden="true">
+                  {"\u270B"}
+                </span>
               </div>
-            ))}
+            </div>
           </div>
+
         </div>
 
-        <div className={styles.block}>
-          <label htmlFor="particle-color" className={styles.label}>
-            Core Color
-          </label>
-          <input
-            id="particle-color"
-            type="color"
-            value={particleColor}
-            onChange={(event) => setParticleColor(event.target.value)}
-            className={styles.colorInput}
-          />
-        </div>
-
-        <div className={styles.instructions}>
-          <p>
-            <strong>Open hand</strong>: expand particles
-          </p>
-          <p>
-            <strong>Fist</strong>: contract and gather
-          </p>
+        <div className={styles.guideBlock}>
+          <span className={styles.label}>Guide</span>
+          <button
+          type="button"
+          className={styles.helpButton}
+          onClick={() => setIsGuideOpen(true)}
+        >
+          <span className={styles.helpButtonIcon} aria-hidden="true">
+            {"\u2197"}
+          </span>
+          <span className={styles.helpButtonText}>How to use the system</span>
+          </button>
         </div>
       </section>
 
-      {/* Bottom-left utility dock: live force feedback + camera placement preview. */}
-      <div className={styles.bottomDock}>
-        <section className={styles.forceCard}>
-          <div className={styles.forceHeader}>
-            <span className={styles.forceTitle}>Force</span>
-            <span className={styles.forceValue}>{forcePercent}%</span>
-          </div>
-
-          <div className={styles.forceMeter}>
-            <span className={styles.forceIcon} aria-hidden="true">
-              {"\u270A"}
-            </span>
-
-            <div className={styles.forceTrack} aria-label="Jauge de force d'ouverture de la main">
-              <div className={styles.forceFill} style={{ width: `${forcePercent}%` }} />
-              <div className={styles.forceThumb} style={{ left: `${forcePercent}%` }} />
-            </div>
-
-            <span className={styles.forceIcon} aria-hidden="true">
-              {"\u270B"}
-            </span>
-          </div>
-        </section>
-
-        <section className={styles.cameraCard}>
-          <p className={styles.cameraLabel}>Camera</p>
+      <div className={styles.cameraDock} style={cameraDockStyle}>
+        <div className={styles.cameraWrap}>
           <video ref={previewVideoRef} className={styles.previewVideo} autoPlay playsInline muted />
-        </section>
+        </div>
       </div>
 
       <video ref={hiddenVideoRef} className={styles.hiddenVideo} playsInline muted />
 
-      {/* Welcome guide shown on first load and reopened later through the "Aide ?" button. */}
+      {/* Welcome guide shown on first load and reopened later through the help button. */}
       <div
         className={`${styles.guideOverlay} ${
           isGuideOpen ? styles.guideOverlayVisible : styles.guideOverlayHidden
         }`}
         aria-hidden={!isGuideOpen}
+        onClick={closeGuide}
       >
-        <section className={styles.guideCard} role="dialog" aria-modal="true" aria-label="Guide d'accueil">
-          <p className={styles.guideEyebrow}>Guide d'accueil</p>
-          <h2 className={styles.guideTitle}>Comment utiliser le systeme</h2>
-          <p className={styles.guideText}>
-            La camera transforme l'ouverture de ta main en force. Main fermee: la jauge
-            retombe. Main ouverte: la jauge monte et la sculpture se deploie.
-          </p>
-
+        <section
+          className={styles.guideCard}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Welcome guide"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <p className={styles.guideEyebrow}>Welcome guide</p>
+          <h2 className={styles.guideTitle}>How to use the system</h2>
           <div className={styles.guideSteps}>
             <div className={styles.guideStep}>
               <span className={styles.guideStepNumber}>1</span>
               <div>
-                <strong className={styles.guideStepTitle}>Autorise la camera</strong>
+                <strong className={styles.guideStepTitle}>Allow the camera</strong>
                 <p className={styles.guideStepText}>
-                  Reste visible dans l'aperçu en bas a gauche pour que le suivi reste stable.
+                  Stay visible in the lower-left preview so tracking remains stable.
                 </p>
               </div>
             </div>
@@ -500,9 +692,9 @@ export default function AetherParticles() {
             <div className={styles.guideStep}>
               <span className={styles.guideStepNumber}>2</span>
               <div>
-                <strong className={styles.guideStepTitle}>Observe la jauge</strong>
+                <strong className={styles.guideStepTitle}>Watch the meter</strong>
                 <p className={styles.guideStepText}>
-                  Elle passe de 0% a 100% selon l'ouverture de la main, entre le poing ferme et la main ouverte.
+                  It moves from 0% to 100% based on your hand opening, from closed fist to open hand.
                 </p>
               </div>
             </div>
@@ -510,9 +702,9 @@ export default function AetherParticles() {
             <div className={styles.guideStep}>
               <span className={styles.guideStepNumber}>3</span>
               <div>
-                <strong className={styles.guideStepTitle}>Teste les modeles</strong>
+                <strong className={styles.guideStepTitle}>Try the presets</strong>
                 <p className={styles.guideStepText}>
-                  Utilise les presets et la couleur du panneau gauche pour changer le rendu.
+                  Use the presets and custom tools in the left panel to change the result.
                 </p>
               </div>
             </div>
@@ -521,23 +713,74 @@ export default function AetherParticles() {
           <div className={styles.guideLegend}>
             <div className={styles.guideLegendItem}>
               <span className={styles.guideLegendIcon}>{"\u270A"}</span>
-              <span>Poing ferme: force basse, particules contractees.</span>
+              <span>Closed fist: low meter, contracted particles.</span>
             </div>
             <div className={styles.guideLegendItem}>
               <span className={styles.guideLegendIcon}>{"\u270B"}</span>
-              <span>Main ouverte: force haute, particules ouvertes.</span>
+              <span>Open hand: high meter, expanded particles.</span>
             </div>
           </div>
 
           <div className={styles.guideActions}>
-            <button type="button" className={styles.guideCloseButton} onClick={() => setIsGuideOpen(false)}>
-              Commencer
+            <button type="button" className={styles.guideCloseButton} onClick={closeGuide}>
+              Start
             </button>
           </div>
         </section>
       </div>
     </main>
   );
+}
+
+function AetherLogo({ className }) {
+  return (
+    <svg viewBox="0 0 64 64" className={className} aria-hidden="true">
+      <defs>
+        <linearGradient id="aether-logo-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#f5d0fe" />
+          <stop offset="52%" stopColor="#7dd3fc" />
+          <stop offset="100%" stopColor="#60a5fa" />
+        </linearGradient>
+      </defs>
+      <path
+        d="M18 38c7-14 21-21 30-14 6 4 6 11 2 17"
+        fill="none"
+        stroke="url(#aether-logo-gradient)"
+        strokeWidth="4"
+        strokeLinecap="round"
+      />
+      <path
+        d="M18 26c9 12 24 17 32 10"
+        fill="none"
+        stroke="url(#aether-logo-gradient)"
+        strokeWidth="3.4"
+        strokeLinecap="round"
+        opacity="0.9"
+      />
+      <circle cx="24" cy="24" r="3.5" fill="#f8fafc" />
+      <circle cx="42" cy="34" r="5.5" fill="#f8fafc" opacity="0.92" />
+      <circle cx="50" cy="20" r="2.8" fill="#7dd3fc" opacity="0.95" />
+    </svg>
+  );
+}
+
+function buildPresetData(type, particleCount, baseColor) {
+  if (type === "supernova") {
+    return createSupernovaData(particleCount);
+  }
+
+  return {
+    positions: buildPresetPositions(type, particleCount),
+    colors: buildPresetColors(type, particleCount, baseColor),
+  };
+}
+
+function buildPresetColors(type, particleCount, baseColor) {
+  if (type === "supernova") {
+    return createSupernovaData(particleCount).colors;
+  }
+
+  return createSolidColors(particleCount, baseColor);
 }
 
 function buildPresetPositions(type, particleCount) {
@@ -554,8 +797,6 @@ function buildPresetPositions(type, particleCount) {
       return createLotusPositions(particleCount);
     case "fireworks":
       return createFireworksPositions(particleCount);
-    case "supernova":
-      return createSupernovaPositions(particleCount);
     case "cube":
       return createCubePositions(particleCount);
     case "square":
@@ -586,6 +827,20 @@ function createSpherePositions(particleCount) {
   return targetPositions;
 }
 
+function createSolidColors(particleCount, hexColor) {
+  const colors = new Float32Array(particleCount * 3);
+  const color = new THREE.Color(hexColor);
+
+  for (let index = 0; index < particleCount; index += 1) {
+    const offset = index * 3;
+    colors[offset] = color.r;
+    colors[offset + 1] = color.g;
+    colors[offset + 2] = color.b;
+  }
+
+  return colors;
+}
+
 function createHeartPositions(particleCount) {
   const targetPositions = new Float32Array(particleCount * 3);
 
@@ -613,26 +868,28 @@ function createHeartPositions(particleCount) {
 
 function createSaturnPositions(particleCount) {
   const targetPositions = new Float32Array(particleCount * 3);
+  const coreCount = Math.floor(particleCount * 0.46);
 
   for (let index = 0; index < particleCount; index += 1) {
     const offset = index * 3;
 
-    if (index < particleCount * 0.4) {
+    if (index < coreCount) {
       const u = Math.random();
       const v = Math.random();
       const theta = 2 * Math.PI * u;
       const phi = Math.acos(2 * v - 1);
+      const radialDistance = Math.cbrt(Math.random()) * 3.5;
 
-      targetPositions[offset] = 3.5 * Math.sin(phi) * Math.cos(theta);
-      targetPositions[offset + 1] = 3.5 * Math.sin(phi) * Math.sin(theta);
-      targetPositions[offset + 2] = 3.5 * Math.cos(phi);
+      targetPositions[offset] = radialDistance * Math.sin(phi) * Math.cos(theta);
+      targetPositions[offset + 1] = radialDistance * Math.sin(phi) * Math.sin(theta);
+      targetPositions[offset + 2] = radialDistance * Math.cos(phi);
       continue;
     }
 
-    const distance = 5 + Math.random() * 3;
+    const distance = 4.8 + Math.random() * 3.2;
     const angle = Math.random() * Math.PI * 2;
     targetPositions[offset] = Math.cos(angle) * distance;
-    targetPositions[offset + 1] = (Math.random() - 0.5) * 0.4;
+    targetPositions[offset + 1] = (Math.random() - 0.5) * 0.6;
     targetPositions[offset + 2] = Math.sin(angle) * distance;
   }
 
@@ -657,23 +914,62 @@ function createFlowerPositions(particleCount) {
   return targetPositions;
 }
 
-// Lotus uses layered petals plus a bowl-like vertical curve to keep the flower readable from the front.
+// Lotus uses layered petal crowns so the blossom reads closer to a real open flower.
 function createLotusPositions(particleCount) {
   const targetPositions = new Float32Array(particleCount * 3);
+  const layers = [
+    { count: 8, length: 4.3, width: 1.2, rise: 0.65, curl: 0.6, offset: 0, weight: 0.46 },
+    { count: 6, length: 3.4, width: 0.98, rise: 1.25, curl: 0.9, offset: Math.PI / 6, weight: 0.34 },
+    { count: 4, length: 2.35, width: 0.72, rise: 1.95, curl: 1.2, offset: Math.PI / 4, weight: 0.2 },
+  ];
 
   for (let index = 0; index < particleCount; index += 1) {
     const offset = index * 3;
-    const theta = Math.random() * Math.PI * 2;
-    const radiusProgress = Math.sqrt(Math.random());
-    const radius = Math.cos(4 * theta) * radiusProgress * 2.55;
-    const x = radius * Math.cos(theta);
-    const z = radius * Math.sin(theta);
-    const y = radiusProgress * radiusProgress * 1.5 - Math.abs(radius) * 0.3 - 0.5;
-    const [volumeX, volumeY, volumeZ] = addVolume(x, y, z, 0.07);
+    const isCore = Math.random() < 0.12;
 
-    targetPositions[offset] = volumeX * 2.2;
-    targetPositions[offset + 1] = volumeY * 2.2;
-    targetPositions[offset + 2] = volumeZ * 2.2;
+    if (isCore) {
+      const coreRadius = Math.sqrt(Math.random()) * 0.8;
+      const coreAngle = Math.random() * Math.PI * 2;
+      const [volumeX, volumeY, volumeZ] = addVolume(
+        Math.cos(coreAngle) * coreRadius,
+        0.55 + Math.random() * 0.4,
+        Math.sin(coreAngle) * coreRadius * 0.78,
+        0.08,
+      );
+
+      targetPositions[offset] = volumeX;
+      targetPositions[offset + 1] = volumeY;
+      targetPositions[offset + 2] = volumeZ;
+      continue;
+    }
+
+    const selector = Math.random();
+    const layer =
+      selector < layers[0].weight
+        ? layers[0]
+        : selector < layers[0].weight + layers[1].weight
+          ? layers[1]
+          : layers[2];
+
+    const petalIndex = Math.floor(Math.random() * layer.count);
+    const angle = (petalIndex / layer.count) * Math.PI * 2 + layer.offset;
+    const progress = Math.sqrt(Math.random());
+    const side = (Math.random() * 2 - 1) * layer.width * Math.pow(1 - progress, 0.52);
+    const forward = lerp(0.28, layer.length, progress);
+    const openCurve = Math.sin(progress * Math.PI) * layer.curl;
+    const localX = Math.cos(angle) * forward - Math.sin(angle) * side;
+    const localZ = (Math.sin(angle) * forward + Math.cos(angle) * side) * 0.78;
+    const localY =
+      -0.95 +
+      layer.rise * progress +
+      openCurve -
+      Math.abs(side) * 0.16 -
+      Math.pow(1 - progress, 1.6) * 0.3;
+    const [volumeX, volumeY, volumeZ] = addVolume(localX, localY, localZ, 0.055);
+
+    targetPositions[offset] = volumeX;
+    targetPositions[offset + 1] = volumeY;
+    targetPositions[offset + 2] = volumeZ;
   }
 
   return targetPositions;
@@ -683,12 +979,12 @@ function createLotusPositions(particleCount) {
 function createBuddhaPositions(particleCount) {
   return sampleMaskShape(
     particleCount,
-    [-1.25, 1.25],
-    [-1.32, 1.36],
+    [-1.32, 1.32],
+    [-1.46, 1.5],
     (x, y) => buddhaMask(x, y),
     (x, y) => {
-      const centered = 1 - Math.min(1, Math.abs(x) * 0.8 + Math.abs(y) * 0.18);
-      return (Math.random() - 0.5) * 0.16 + centered * 0.26;
+      const centered = 1 - Math.min(1, Math.abs(x) * 0.72 + Math.abs(y) * 0.16);
+      return (Math.random() - 0.5) * 0.14 + centered * 0.28;
     },
   );
 }
@@ -698,44 +994,96 @@ function createFireworksPositions(particleCount) {
 
   for (let index = 0; index < particleCount; index += 1) {
     const offset = index * 3;
-    const burstCount = 10;
-    const burstAngle = (Math.floor(Math.random() * burstCount) / burstCount) * Math.PI * 2;
-    const angle = burstAngle + (Math.random() - 0.5) * 0.26;
-    const distance = lerp(1.1, 7.9, Math.sqrt(Math.random()));
-    const spread = 0.22 + distance * 0.035;
+    const angle = Math.random() * Math.PI * 2;
+    const distance = Math.random() * 8;
 
-    targetPositions[offset] = Math.cos(angle) * distance + (Math.random() - 0.5) * spread;
-    targetPositions[offset + 1] =
-      Math.sin(angle) * distance + (Math.random() - 0.5) * spread;
-    targetPositions[offset + 2] = (Math.random() - 0.5) * 0.7;
+    targetPositions[offset] = Math.cos(angle) * distance;
+    targetPositions[offset + 1] = Math.sin(angle) * distance;
+    targetPositions[offset + 2] = (Math.random() - 0.5) * distance;
   }
 
   return targetPositions;
 }
 
-function createSupernovaPositions(particleCount) {
-  const targetPositions = new Float32Array(particleCount * 3);
-  const armCount = 14;
+function createSupernovaData(particleCount) {
+  const positions = new Float32Array(particleCount * 3);
+  const colors = new Float32Array(particleCount * 3);
+  const coreColor = new THREE.Color("#ffe7b3");
+  const warmCoreColor = new THREE.Color("#ffb58e");
+  const haloColor = new THREE.Color("#f3f8ff");
+  const armColor = new THREE.Color("#6ec5ff");
+  const blueDustColor = new THREE.Color("#294b92");
+  const dustColor = new THREE.Color("#d9c3c8");
+  const knotColor = new THREE.Color("#ffffff");
 
   for (let index = 0; index < particleCount; index += 1) {
     const offset = index * 3;
-    const armAngle = (Math.floor(Math.random() * armCount) / armCount) * Math.PI * 2;
-    const angle = armAngle + (Math.random() - 0.5) * 0.22;
-    const radius = lerp(0.25, 6.2, Math.pow(Math.random(), 0.52));
-    const flare = radius * radius * 0.015;
+    const branch = Math.random();
+    const color = new THREE.Color();
+    let x;
+    let y;
+    let z;
+    let radiusRatio;
 
-    targetPositions[offset] = Math.cos(angle) * radius + (Math.random() - 0.5) * flare;
-    targetPositions[offset + 1] = Math.sin(angle) * radius + (Math.random() - 0.5) * flare;
-    targetPositions[offset + 2] = (Math.random() - 0.5) * 0.55;
+    if (branch < 0.24) {
+      const radius = Math.pow(Math.random(), 1.85) * 1.9;
+      const angle = Math.random() * Math.PI * 2;
+      x = Math.cos(angle) * radius * 1.08 + (Math.random() - 0.5) * 0.16;
+      y = Math.sin(angle) * radius * 0.72 + (Math.random() - 0.5) * 0.14;
+      z = (Math.random() - 0.5) * 0.34;
+      radiusRatio = radius / 8.2;
+      color.copy(coreColor).lerp(warmCoreColor, Math.random() * 0.45);
+    } else if (branch < 0.68) {
+      const radius = lerp(0.7, 7.6, Math.pow(Math.random(), 0.62));
+      const angle = Math.random() * Math.PI * 2;
+      x = Math.cos(angle) * radius * 1.42 + (Math.random() - 0.5) * 0.3;
+      y = Math.sin(angle) * radius * 0.82 + (Math.random() - 0.5) * 0.26;
+      z = (Math.random() - 0.5) * (0.18 + radius * 0.065);
+      radiusRatio = radius / 8.2;
+      color.copy(haloColor).lerp(armColor, radiusRatio * 0.7);
+      if (Math.random() < 0.18) {
+        color.lerp(dustColor, 0.35);
+      }
+    } else {
+      const armIndex = Math.floor(Math.random() * 4);
+      const radius = lerp(0.9, 8.2, Math.pow(Math.random(), 0.55));
+      const twist = radius * 0.88;
+      const angle =
+        (armIndex / 4) * Math.PI * 2 +
+        twist +
+        (Math.random() - 0.5) * (0.14 + radius * 0.018);
+      const width = (Math.random() - 0.5) * (0.2 + radius * 0.12);
+      x = Math.cos(angle) * radius * 1.38 - Math.sin(angle) * width;
+      y = Math.sin(angle) * radius * 0.8 + Math.cos(angle) * width * 0.82;
+      z = (Math.random() - 0.5) * (0.16 + radius * 0.075);
+      radiusRatio = radius / 8.2;
 
-    if (index < particleCount * 0.16) {
-      targetPositions[offset] *= 0.38;
-      targetPositions[offset + 1] *= 0.38;
-      targetPositions[offset + 2] *= 0.3;
+      color.copy(haloColor).lerp(armColor, 0.55 + radiusRatio * 0.35);
+      if (Math.random() < 0.12) {
+        color.lerp(knotColor, 0.55);
+      }
+      if (Math.random() < 0.16) {
+        color.lerp(dustColor, 0.42);
+      }
+      if (radiusRatio > 0.6) {
+        color.lerp(blueDustColor, (radiusRatio - 0.6) / 0.4);
+      }
     }
+
+    positions[offset] = x;
+    positions[offset + 1] = y;
+    positions[offset + 2] = z;
+
+    if (branch >= 0.22 && radiusRatio < 0.24) {
+      color.lerp(coreColor, 0.35);
+    }
+
+    colors[offset] = color.r;
+    colors[offset + 1] = color.g;
+    colors[offset + 2] = color.b;
   }
 
-  return targetPositions;
+  return { positions, colors };
 }
 
 function createCubePositions(particleCount) {
@@ -770,29 +1118,37 @@ function createCubePositions(particleCount) {
 // Square is intentionally tighter than the previous version so it reads as less zoomed-out on screen.
 function createSquarePositions(particleCount) {
   const targetPositions = new Float32Array(particleCount * 3);
-  const halfSize = 2.95;
-  const thickness = 0.16;
+  const halfSize = 6.7;
+  const thickness = 0.28;
 
   for (let index = 0; index < particleCount; index += 1) {
     const offset = index * 3;
-    const edge = index % 4;
-    const t = (Math.random() - 0.5) * halfSize * 2;
-    const depth = (Math.random() - 0.5) * 0.16;
-    const borderJitter = (Math.random() - 0.5) * thickness;
-    const bandDrift = Math.random() < 0.2 ? (Math.random() - 0.5) * 0.5 : 0;
+    const depth = (Math.random() - 0.5) * 0.2;
 
-    if (edge === 0) {
-      targetPositions[offset] = -halfSize + borderJitter;
-      targetPositions[offset + 1] = t + bandDrift;
-    } else if (edge === 1) {
-      targetPositions[offset] = halfSize + borderJitter;
-      targetPositions[offset + 1] = t + bandDrift;
-    } else if (edge === 2) {
-      targetPositions[offset] = t + bandDrift;
-      targetPositions[offset + 1] = -halfSize + borderJitter;
+    // Keep the square contour dominant, then lightly seed particles inside like the heart shape.
+    if (Math.random() < 0.82) {
+      const edge = Math.floor(Math.random() * 4);
+      const t = (Math.random() - 0.5) * halfSize * 2;
+      const borderJitter = (Math.random() - 0.5) * thickness;
+      const bandDrift = Math.random() < 0.28 ? (Math.random() - 0.5) * 0.8 : 0;
+
+      if (edge === 0) {
+        targetPositions[offset] = -halfSize + borderJitter;
+        targetPositions[offset + 1] = t + bandDrift;
+      } else if (edge === 1) {
+        targetPositions[offset] = halfSize + borderJitter;
+        targetPositions[offset + 1] = t + bandDrift;
+      } else if (edge === 2) {
+        targetPositions[offset] = t + bandDrift;
+        targetPositions[offset + 1] = -halfSize + borderJitter;
+      } else {
+        targetPositions[offset] = t + bandDrift;
+        targetPositions[offset + 1] = halfSize + borderJitter;
+      }
     } else {
-      targetPositions[offset] = t + bandDrift;
-      targetPositions[offset + 1] = halfSize + borderJitter;
+      const fillBias = lerp(0.72, 1, Math.sqrt(Math.random()));
+      targetPositions[offset] = (Math.random() - 0.5) * halfSize * 2 * fillBias;
+      targetPositions[offset + 1] = (Math.random() - 0.5) * halfSize * 2 * fillBias;
     }
 
     targetPositions[offset + 2] = depth;
@@ -837,20 +1193,59 @@ function buddhaMask(x, y) {
   const inCircle = (cx, cy, radius) => (x - cx) ** 2 + (y - cy) ** 2 <= radius ** 2;
   const inEllipse = (cx, cy, rx, ry) =>
     ((x - cx) ** 2) / (rx ** 2) + ((y - cy) ** 2) / (ry ** 2) <= 1;
+  const inRotatedEllipse = (cx, cy, rx, ry, angle) => {
+    const dx = x - cx;
+    const dy = y - cy;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    const xr = dx * cos + dy * sin;
+    const yr = -dx * sin + dy * cos;
+    return (xr ** 2) / (rx ** 2) + (yr ** 2) / (ry ** 2) <= 1;
+  };
 
-  const head = inCircle(0, 0.86, 0.24) || inCircle(0, 1.12, 0.12);
-  const shoulders = inEllipse(0, 0.44, 0.62, 0.32);
-  const torso = inEllipse(0, 0.04, 0.42, 0.52);
-  const arms = inEllipse(-0.46, 0.05, 0.16, 0.28) || inEllipse(0.46, 0.05, 0.16, 0.28);
-  const lap = inEllipse(0, -0.54, 0.9, 0.36);
-  const lotus =
-    inEllipse(-0.42, -0.88, 0.34, 0.16) ||
-    inEllipse(0, -0.92, 0.44, 0.18) ||
-    inEllipse(0.42, -0.88, 0.34, 0.16);
-  const innerGap =
-    inEllipse(0, 0.2, 0.15, 0.26) && y < 0.46 && y > -0.08 && Math.abs(x) < 0.22;
+  const head =
+    inEllipse(0, 0.88, 0.28, 0.34) ||
+    inCircle(0, 1.22, 0.12) ||
+    inCircle(-0.07, 1.12, 0.085) ||
+    inCircle(0.07, 1.12, 0.085) ||
+    inCircle(-0.12, 1.02, 0.075) ||
+    inCircle(0.12, 1.02, 0.075) ||
+    inCircle(-0.17, 0.9, 0.07) ||
+    inCircle(0.17, 0.9, 0.07);
+  const ears = inEllipse(-0.3, 0.78, 0.08, 0.24) || inEllipse(0.3, 0.78, 0.08, 0.24);
+  const neck = inEllipse(0, 0.53, 0.14, 0.11);
+  const shoulders = inEllipse(0, 0.33, 0.82, 0.31);
+  const torso = inEllipse(0, -0.02, 0.54, 0.68);
+  const leftSleeve = inRotatedEllipse(-0.56, -0.02, 0.21, 0.44, 0.18);
+  const rightSleeve = inRotatedEllipse(0.58, 0.02, 0.2, 0.42, -0.18);
+  const raisedForearm = inRotatedEllipse(0.14, 0.03, 0.12, 0.31, 0.08);
+  const raisedHand = inEllipse(0.16, 0.25, 0.12, 0.16);
+  const fingers = inRotatedEllipse(0.2, 0.38, 0.055, 0.17, 0.04);
+  const lapLeft = inRotatedEllipse(-0.5, -0.84, 0.56, 0.24, -0.26);
+  const lapRight = inRotatedEllipse(0.5, -0.84, 0.56, 0.24, 0.26);
+  const centerCloth = inEllipse(0, -0.72, 0.3, 0.28) || inEllipse(0, -1.0, 0.18, 0.18);
+  const lowerRobe =
+    inRotatedEllipse(-0.22, -0.56, 0.24, 0.2, -0.35) ||
+    inRotatedEllipse(0.24, -0.48, 0.26, 0.18, 0.28) ||
+    inEllipse(0.08, -0.38, 0.2, 0.12);
 
-  return (head || shoulders || torso || arms || lap || lotus) && !innerGap;
+  const silhouette =
+    head ||
+    ears ||
+    neck ||
+    shoulders ||
+    torso ||
+    leftSleeve ||
+    rightSleeve ||
+    raisedForearm ||
+    raisedHand ||
+    fingers ||
+    lapLeft ||
+    lapRight ||
+    centerCloth ||
+    lowerRobe;
+
+  return silhouette;
 }
 
 function addVolume(x, y, z, amount) {
@@ -864,3 +1259,5 @@ function addVolume(x, y, z, amount) {
 function lerp(start, end, progress) {
   return start + (end - start) * progress;
 }
+
+
