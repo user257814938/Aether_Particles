@@ -12,16 +12,16 @@ const { Hands } = handsPackage;
 // - `icon` supports faster visual recognition in the sidebar
 // - `rotation` decides whether the shape can tilt vertically or should stay front-facing
 const PRESETS = {
-  sphere: { label: "Sphere", color: "#2563eb", icon: "\u25CF", rotation: "full" },
-  heart: { label: "Heart", color: "#dc2626", icon: "\u2665", rotation: "drift" },
-  saturn: { label: "Saturn", color: "#caa46b", icon: "\u{1FA90}", rotation: "side" },
-  buddha: { label: "Buddha", color: "#b7791f", icon: "\u2638", rotation: "drift" },
-  flower: { label: "Flower", color: "#e11d48", icon: "\u273F", rotation: "lotusSweep" },
-  lotus: { label: "Lotus", color: "#ec4899", icon: "\u{1FAB7}", rotation: "lotusSweep" },
-  fireworks: { label: "Fireworks", color: "#b91c1c", icon: "\u2726", rotation: "full" },
-  supernova: { label: "Supernova", color: "#8b5cf6", icon: "\u273A", rotation: "galaxyTilt" },
-  cube: { label: "Cube", color: "#14b8a6", icon: "\u25A3", rotation: "full" },
-  square: { label: "Square", color: "#d97706", icon: "\u25A0", rotation: "drift" },
+  sphere: { label: "Sphere", color: "#2563eb", icon: "\u25CF", rotation: "sphereFull" },
+  heart: { label: "Heart", color: "#dc2626", icon: "\u2665", rotation: "heartDrift" },
+  saturn: { label: "Saturn", color: "#caa46b", icon: "\u{1FA90}", rotation: "lotusUpperFull" },
+  buddha: { label: "Buddha", color: "#b7791f", icon: "\u2638", rotation: "heartDrift" },
+  flower: { label: "Flower", color: "#e11d48", icon: "\u273F", rotation: "heartDrift" },
+  lotus: { label: "Lotus", color: "#ec4899", icon: "\u{1FAB7}", rotation: "lotusUpperFull" },
+  fireworks: { label: "Fireworks", color: "#b91c1c", icon: "\u2726", rotation: "fireworksFull" },
+  supernova: { label: "Supernova", color: "#8b5cf6", icon: "\u273A", rotation: "supernovaFixed" },
+  cube: { label: "Cube", color: "#14b8a6", icon: "\u25A3", rotation: "cubeFull" },
+  square: { label: "Square", color: "#d97706", icon: "\u25A0", rotation: "heartDrift" },
 };
 
 const PRESET_SECTIONS = [
@@ -182,6 +182,11 @@ export default function AetherParticles() {
   const mediaStreamRef = useRef(null);
   const lastVideoTimeRef = useRef(-1);
   const handRequestInFlightRef = useRef(false);
+  const rotationDirectionRef = useRef({
+    lotusUpperFull: Math.random() < 0.5 ? -1 : 1,
+    galaxyTilt: Math.random() < 0.5 ? -1 : 1,
+    supernovaFixed: Math.random() < 0.5 ? -1 : 1,
+  });
   const currentExpansionRef = useRef(0.5);
   const targetExpansionRef = useRef(0.5);
   const colorTargetRef = useRef(new THREE.Color(PRESETS[DEFAULT_PRESET].color));
@@ -200,6 +205,7 @@ export default function AetherParticles() {
   const [preloaderProgress, setPreloaderProgress] = useState(0);
   // The onboarding guide opens only on the first visit, then remains user-controlled via the left panel.
   const [isGuideOpen, setIsGuideOpen] = useState(false);
+  const currentYear = new Date().getFullYear();
 
   const presetSections = PRESET_SECTIONS.map((section) =>
     section.map((key) => [key, PRESETS[key]]),
@@ -371,7 +377,7 @@ export default function AetherParticles() {
 
     try {
       window.localStorage.setItem(GUIDE_STORAGE_KEY, "true");
-    } catch {}
+    } catch { }
   };
 
   useEffect(() => {
@@ -422,14 +428,14 @@ export default function AetherParticles() {
     const initialPresetData =
       activePresetRef.current === "custom" && customManifestRef.current
         ? {
-            positions: customManifestRef.current.positions,
-            colors: createSolidColors(particleCount, customManifestRef.current.color),
-          }
+          positions: customManifestRef.current.positions,
+          colors: createSolidColors(particleCount, customManifestRef.current.color),
+        }
         : buildPresetData(
-            activePresetRef.current,
-            particleCount,
-            PRESETS[activePresetRef.current].color,
-          );
+          activePresetRef.current,
+          particleCount,
+          PRESETS[activePresetRef.current].color,
+        );
     targetPositionsRef.current = initialPresetData.positions;
     targetColorsRef.current = initialPresetData.colors;
 
@@ -462,7 +468,7 @@ export default function AetherParticles() {
       }
 
       previewVideoRef.current.srcObject = hiddenVideoRef.current.srcObject;
-      previewVideoRef.current.play().catch(() => {});
+      previewVideoRef.current.play().catch(() => { });
     };
 
     const resize = () => {
@@ -577,13 +583,43 @@ export default function AetherParticles() {
           : PRESETS[activePresetRef.current].rotation;
       const time = performance.now() * 0.001;
 
-      if (rotationMode === "full") {
+      if (rotationMode === "sphereFull") {
+        particles.rotation.y += 0.0022;
+        particles.rotation.x += 0.0011;
+        particles.rotation.z += (0 - particles.rotation.z) * 0.08;
+      } else if (rotationMode === "cubeFull") {
+        particles.rotation.y += 0.0022;
+        particles.rotation.x += 0.0011;
+        particles.rotation.z += (0 - particles.rotation.z) * 0.08;
+      } else if (rotationMode === "full") {
         particles.rotation.y += 0.002;
         particles.rotation.x += 0.001;
         particles.rotation.z += (0 - particles.rotation.z) * 0.08;
+      } else if (rotationMode === "fireworksFull") {
+        particles.rotation.y += 0.0022;
+        particles.rotation.x += 0.0011;
+        particles.rotation.z += (0 - particles.rotation.z) * 0.08;
+      } else if (rotationMode === "lotusUpperFull") {
+        // Lotus can orbit freely sideways, but its vertical sweep stays above the underside.
+        const targetX = 0.42 + Math.sin(time * 0.78) * 0.42;
+        particles.rotation.x += (targetX - particles.rotation.x) * 0.08;
+        particles.rotation.y += 0.002 * rotationDirectionRef.current.lotusUpperFull;
+        particles.rotation.z += (0 - particles.rotation.z) * 0.08;
+      } else if (rotationMode === "supernovaFixed") {
+        const targetX = -0.9 - (Math.sin(time * 0.39 - Math.PI / 2) * 0.5 + 0.5) * 0.75;
+        particles.rotation.x += (targetX - particles.rotation.x) * 0.08;
+        particles.rotation.y += (0 - particles.rotation.y) * 0.08;
+        particles.rotation.z += 0.0009 * rotationDirectionRef.current.supernovaFixed;
       } else if (rotationMode === "lotusSweep") {
         const targetX = -0.2 + Math.cos(time * 0.42) * 0.025;
         const targetY = (Math.sin(time * 0.42) * 0.5 + 0.5) * 1.12;
+        particles.rotation.x += (targetX - particles.rotation.x) * 0.08;
+        particles.rotation.y += (targetY - particles.rotation.y) * 0.08;
+        particles.rotation.z += (0 - particles.rotation.z) * 0.08;
+      } else if (rotationMode === "heartDrift") {
+        // Heart gets its own tuned motion profile: larger silhouette, stronger swing, slightly faster tempo.
+        const targetX = Math.sin(time * 1.045) * 0.1573;
+        const targetY = Math.cos(time * 0.792) * 0.2662;
         particles.rotation.x += (targetX - particles.rotation.x) * 0.08;
         particles.rotation.y += (targetY - particles.rotation.y) * 0.08;
         particles.rotation.z += (0 - particles.rotation.z) * 0.08;
@@ -606,8 +642,13 @@ export default function AetherParticles() {
         particles.rotation.y += (targetY - particles.rotation.y) * 0.08;
         particles.rotation.z += 0.0022;
       } else if (rotationMode === "galaxyTilt") {
-        const targetX = 1.72 + Math.sin(time * 0.56) * 0.62;
-        const targetY = Math.cos(time * 0.44) * 0.18;
+        const targetX = 1.72 + Math.sin(time * 0.26125) * 0.62;
+        particles.rotation.x += (targetX - particles.rotation.x) * 0.08;
+        particles.rotation.y += 0.0009 * rotationDirectionRef.current.galaxyTilt;
+        particles.rotation.z += (0 - particles.rotation.z) * 0.08;
+      } else if (rotationMode === "saturnSide") {
+        const targetX = 0.36 + Math.sin(time * 1.045) * 0.13;
+        const targetY = 0.82 + Math.cos(time * 0.792) * 0.08;
         particles.rotation.x += (targetX - particles.rotation.x) * 0.08;
         particles.rotation.y += (targetY - particles.rotation.y) * 0.08;
         particles.rotation.z += (0 - particles.rotation.z) * 0.08;
@@ -718,7 +759,7 @@ export default function AetherParticles() {
       window.removeEventListener("resize", resize);
 
       if (handsRef.current) {
-        handsRef.current.close().catch(() => {});
+        handsRef.current.close().catch(() => { });
         handsRef.current = null;
       }
 
@@ -783,6 +824,13 @@ export default function AetherParticles() {
 
   const handlePresetChange = (nextPreset) => {
     customManifestRef.current = null;
+    if (PRESETS[nextPreset]?.rotation === "lotusUpperFull") {
+      rotationDirectionRef.current.lotusUpperFull = Math.random() < 0.5 ? -1 : 1;
+    } else if (PRESETS[nextPreset]?.rotation === "supernovaFixed") {
+      rotationDirectionRef.current.supernovaFixed = Math.random() < 0.5 ? -1 : 1;
+    } else if (PRESETS[nextPreset]?.rotation === "galaxyTilt") {
+      rotationDirectionRef.current.galaxyTilt = Math.random() < 0.5 ? -1 : 1;
+    }
     setPreset(nextPreset);
     setParticleColor(PRESETS[nextPreset].color);
     const nextUrl = new URL(window.location.href);
@@ -817,9 +865,8 @@ export default function AetherParticles() {
 
       {ENABLE_PRELOADER ? (
         <div
-          className={`${styles.preloader} ${
-            isPreloaderVisible ? styles.preloaderVisible : styles.preloaderHidden
-          }`}
+          className={`${styles.preloader} ${isPreloaderVisible ? styles.preloaderVisible : styles.preloaderHidden
+            }`}
           aria-hidden={!isPreloaderVisible}
         >
           <div className={styles.preloaderCard}>
@@ -994,9 +1041,8 @@ export default function AetherParticles() {
 
       {/* Welcome guide shown on first load and reopened later through the help button. */}
       <div
-        className={`${styles.guideOverlay} ${
-          isGuideOpen ? styles.guideOverlayVisible : styles.guideOverlayHidden
-        }`}
+        className={`${styles.guideOverlay} ${isGuideOpen ? styles.guideOverlayVisible : styles.guideOverlayHidden
+          }`}
         aria-hidden={!isGuideOpen}
         onClick={closeGuide}
       >
@@ -1050,6 +1096,27 @@ export default function AetherParticles() {
               <span className={styles.guideLegendIcon}>{"\u270B"}</span>
               <span>Open hand: high meter, expanded particles.</span>
             </div>
+          </div>
+
+          <div className={styles.guideFooter}>
+            <p className={styles.guideMetaLead}>
+              Contact us{" "}
+              <a className={styles.guideLink} href="mailto:brian@osso.website">
+                brian@osso.website
+              </a>
+            </p>
+            <p className={styles.guideMetaText}>
+              Built by{" "}
+              <a
+                className={styles.guideLink}
+                href="https://osso.website"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Osso Website
+              </a>
+            </p>
+            <p className={styles.guideCopyright}>© {currentYear} aether</p>
           </div>
 
           <div className={styles.guideActions}>
@@ -1320,7 +1387,7 @@ function triangleArea(a, b, c) {
 
 function createSpherePositions(particleCount) {
   const targetPositions = new Float32Array(particleCount * 3);
-  const radius = 5;
+  const radius = 7.5;
 
   for (let index = 0; index < particleCount; index += 1) {
     const offset = index * 3;
@@ -1354,13 +1421,18 @@ function createSolidColors(particleCount, hexColor) {
 
 function createHeartPositions(particleCount) {
   const targetPositions = new Float32Array(particleCount * 3);
+  // Heart contour is intentionally over-sampled so the outline reads denser than the interior.
+  const contourCount = Math.floor(particleCount * 0.66);
 
   for (let index = 0; index < particleCount; index += 1) {
     const offset = index * 3;
     const t = Math.random() * 2 * Math.PI;
-    const scale = 0.3;
-    const fillBias = lerp(0.72, 1, Math.sqrt(Math.random()));
-    const jitter = (Math.random() - 0.5) * 0.08;
+    const scale = 0.45;
+    const isContour = index < contourCount;
+    const fillBias = isContour
+      ? lerp(0.94, 1.02, Math.random())
+      : lerp(0.62, 0.96, Math.sqrt(Math.random()));
+    const jitter = (Math.random() - 0.5) * (isContour ? 0.04 : 0.08);
 
     targetPositions[offset] = 16 * Math.sin(t) ** 3 * scale * fillBias + jitter;
     targetPositions[offset + 1] =
@@ -1380,6 +1452,8 @@ function createHeartPositions(particleCount) {
 function createSaturnPositions(particleCount) {
   const targetPositions = new Float32Array(particleCount * 3);
   const coreCount = Math.floor(particleCount * 0.46);
+  const scale = 1.125;
+  const coreRadius = 3.5 * scale;
 
   for (let index = 0; index < particleCount; index += 1) {
     const offset = index * 3;
@@ -1389,7 +1463,7 @@ function createSaturnPositions(particleCount) {
       const v = Math.random();
       const theta = 2 * Math.PI * u;
       const phi = Math.acos(2 * v - 1);
-      const radialDistance = Math.cbrt(Math.random()) * 3.5;
+      const radialDistance = Math.cbrt(Math.random()) * coreRadius;
 
       targetPositions[offset] = radialDistance * Math.sin(phi) * Math.cos(theta);
       targetPositions[offset + 1] = radialDistance * Math.sin(phi) * Math.sin(theta);
@@ -1397,10 +1471,10 @@ function createSaturnPositions(particleCount) {
       continue;
     }
 
-    const distance = 4.8 + Math.random() * 3.2;
+    const distance = (4.8 + Math.random() * 3.2) * scale;
     const angle = Math.random() * Math.PI * 2;
     targetPositions[offset] = Math.cos(angle) * distance;
-    targetPositions[offset + 1] = (Math.random() - 0.5) * 0.6;
+    targetPositions[offset + 1] = (Math.random() - 0.5) * 0.6 * scale;
     targetPositions[offset + 2] = Math.sin(angle) * distance;
   }
 
@@ -1410,6 +1484,7 @@ function createSaturnPositions(particleCount) {
 // Front-facing polar flower based on a rose curve for a clean face-on silhouette.
 function createFlowerPositions(particleCount) {
   const targetPositions = new Float32Array(particleCount * 3);
+  const scale = 2.25 * 1.5;
 
   for (let index = 0; index < particleCount; index += 1) {
     const offset = index * 3;
@@ -1417,8 +1492,8 @@ function createFlowerPositions(particleCount) {
     const radius = 2 * Math.cos(5 * phi) + 1;
     const fill = lerp(0.35, 1, Math.sqrt(Math.random()));
 
-    targetPositions[offset] = radius * fill * Math.cos(phi) * 2.25;
-    targetPositions[offset + 1] = radius * fill * Math.sin(phi) * 2.25;
+    targetPositions[offset] = radius * fill * Math.cos(phi) * scale;
+    targetPositions[offset + 1] = radius * fill * Math.sin(phi) * scale;
     targetPositions[offset + 2] = (Math.random() - 0.5) * 0.75;
   }
 
@@ -1483,12 +1558,16 @@ function createLotusPositions(particleCount) {
     targetPositions[offset + 2] = volumeZ;
   }
 
+  for (let index = 0; index < targetPositions.length; index += 1) {
+    targetPositions[index] *= 1.5;
+  }
+
   return targetPositions;
 }
 
 // Buddha is sampled from a 2D silhouette mask, then extruded slightly in depth to preserve the figure.
 function createBuddhaPositions(particleCount) {
-  return sampleMaskShape(
+  const positions = sampleMaskShape(
     particleCount,
     [-1.32, 1.32],
     [-1.46, 1.5],
@@ -1498,15 +1577,23 @@ function createBuddhaPositions(particleCount) {
       return (Math.random() - 0.5) * 0.14 + centered * 0.28;
     },
   );
+
+  // Buddha mirrors the heart tuning here: +50% global size with the same motion profile.
+  for (let index = 0; index < positions.length; index += 1) {
+    positions[index] *= 1.5;
+  }
+
+  return positions;
 }
 
 function createFireworksPositions(particleCount) {
   const targetPositions = new Float32Array(particleCount * 3);
+  const scale = 1.125;
 
   for (let index = 0; index < particleCount; index += 1) {
     const offset = index * 3;
     const angle = Math.random() * Math.PI * 2;
-    const distance = Math.random() * 8;
+    const distance = Math.random() * 8 * scale;
 
     targetPositions[offset] = Math.cos(angle) * distance;
     targetPositions[offset + 1] = Math.sin(angle) * distance;
@@ -1519,6 +1606,7 @@ function createFireworksPositions(particleCount) {
 function createSupernovaData(particleCount) {
   const positions = new Float32Array(particleCount * 3);
   const colors = new Float32Array(particleCount * 3);
+  const scale = 1.125;
   const coreColor = new THREE.Color("#ffe7b3");
   const warmCoreColor = new THREE.Color("#ffb58e");
   const haloColor = new THREE.Color("#f3f8ff");
@@ -1537,7 +1625,7 @@ function createSupernovaData(particleCount) {
     let radiusRatio;
 
     if (branch < 0.24) {
-      const radius = Math.pow(Math.random(), 1.85) * 1.9;
+      const radius = Math.pow(Math.random(), 1.85) * 1.9 * scale;
       const angle = Math.random() * Math.PI * 2;
       x = Math.cos(angle) * radius * 1.08 + (Math.random() - 0.5) * 0.16;
       y = Math.sin(angle) * radius * 0.72 + (Math.random() - 0.5) * 0.14;
@@ -1545,7 +1633,7 @@ function createSupernovaData(particleCount) {
       radiusRatio = radius / 8.2;
       color.copy(coreColor).lerp(warmCoreColor, Math.random() * 0.45);
     } else if (branch < 0.68) {
-      const radius = lerp(0.7, 7.6, Math.pow(Math.random(), 0.62));
+      const radius = lerp(0.7, 7.6, Math.pow(Math.random(), 0.62)) * scale;
       const angle = Math.random() * Math.PI * 2;
       x = Math.cos(angle) * radius * 1.42 + (Math.random() - 0.5) * 0.3;
       y = Math.sin(angle) * radius * 0.82 + (Math.random() - 0.5) * 0.26;
@@ -1557,7 +1645,7 @@ function createSupernovaData(particleCount) {
       }
     } else {
       const armIndex = Math.floor(Math.random() * 4);
-      const radius = lerp(0.9, 8.2, Math.pow(Math.random(), 0.55));
+      const radius = lerp(0.9, 8.2, Math.pow(Math.random(), 0.55)) * scale;
       const twist = radius * 0.88;
       const angle =
         (armIndex / 4) * Math.PI * 2 +
@@ -1599,7 +1687,7 @@ function createSupernovaData(particleCount) {
 
 function createCubePositions(particleCount) {
   const targetPositions = new Float32Array(particleCount * 3);
-  const halfSize = 4.2;
+  const halfSize = 4.725;
 
   for (let index = 0; index < particleCount; index += 1) {
     const offset = index * 3;
@@ -1629,7 +1717,7 @@ function createCubePositions(particleCount) {
 // Square is intentionally tighter than the previous version so it reads as less zoomed-out on screen.
 function createSquarePositions(particleCount) {
   const targetPositions = new Float32Array(particleCount * 3);
-  const halfSize = 6.7;
+  const halfSize = 8.375;
   const thickness = 0.28;
 
   for (let index = 0; index < particleCount; index += 1) {

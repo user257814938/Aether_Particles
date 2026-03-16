@@ -65,8 +65,8 @@
   place-items: center;
   padding: 24px;
   background:
-    radial-gradient(circle at top, rgba(59, 130, 246, 0.16), transparent 28%),
-    rgba(2, 5, 10, 0.94);
+    radial-gradient(circle at top right, rgba(59, 130, 246, 0.18), transparent 24%),
+    rgba(12, 16, 28, 0.96);
   backdrop-filter: blur(12px);
   transition:
     opacity 260ms ease,
@@ -765,6 +765,51 @@
   font-size: 22px;
 }
 
+.guideFooter {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  margin-top: 22px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.guideMetaLead,
+.guideMetaText,
+.guideCopyright {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.52);
+}
+
+.guideLink {
+  color: rgba(125, 211, 252, 0.92);
+  text-decoration: none;
+  transition:
+    color 160ms ease,
+    opacity 160ms ease;
+}
+
+.guideLink:hover {
+  color: #dbeafe;
+}
+
+.guideMetaLead {
+  justify-self: start;
+  text-align: left;
+}
+
+.guideMetaText {
+  justify-self: center;
+  text-align: center;
+}
+
+.guideCopyright {
+  justify-self: end;
+  text-align: right;
+}
+
 .guideActions {
   display: flex;
   justify-content: center;
@@ -818,5 +863,18 @@
   .guideCard {
     padding: 20px;
     border-radius: 24px;
+  }
+
+  .guideFooter {
+    grid-template-columns: 1fr;
+    justify-items: start;
+    gap: 8px;
+  }
+
+  .guideMetaLead,
+  .guideMetaText,
+  .guideCopyright {
+    justify-self: start;
+    text-align: left;
   }
 }
