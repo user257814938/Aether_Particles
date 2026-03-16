@@ -2,11 +2,51 @@
   position: relative;
   min-height: 100vh;
   overflow: hidden;
+  isolation: isolate;
+  background: #000;
+}
+
+.page::before,
+.page::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.page::before {
+  z-index: -2;
   background:
-    radial-gradient(circle at 18% 18%, rgba(59, 130, 246, 0.18), transparent 24%),
-    radial-gradient(circle at 82% 24%, rgba(168, 85, 247, 0.18), transparent 20%),
-    radial-gradient(circle at 50% 100%, rgba(249, 115, 22, 0.16), transparent 36%),
-    #02050a;
+    radial-gradient(circle at 50% 100%, rgba(255, 255, 255, 0.03), transparent 28%),
+    #000;
+}
+
+.page::after {
+  z-index: -1;
+  inset: 42% -10% -18%;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 0.045) 48%,
+      rgba(255, 255, 255, 0.015) 100%
+    ),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12) 1px, transparent 1px);
+  background-size:
+    100% 100%,
+    72px 100%,
+    100% 72px;
+  opacity: 0.34;
+  transform-origin: center top;
+  transform: perspective(900px) rotateX(74deg) scale(1.28);
+  mask-image: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0) 0%,
+    rgba(0, 0, 0, 0.18) 16%,
+    rgba(0, 0, 0, 0.84) 46%,
+    rgba(0, 0, 0, 1) 100%
+  );
 }
 
 .canvas {
