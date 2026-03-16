@@ -40,6 +40,7 @@ const DEFAULT_STATUS = {
 const GUIDE_STORAGE_KEY = "aether-guide-dismissed";
 const DEFAULT_PRESET = "heart";
 const DEFAULT_CUSTOM_HINT = "Try octagon, circle, hexagon, triangle, star, or spiral.";
+const CUSTOM_PLACEHOLDER_EXAMPLES = ["octagon", "circle", "hexagon", "triangle", "star", "spiral"];
 const CUSTOM_SHAPE_LIBRARY = {
   circle: {
     slug: "circle",
@@ -193,6 +194,7 @@ export default function AetherParticles() {
   const [forceLevel, setForceLevel] = useState(0);
   const [customPrompt, setCustomPrompt] = useState("");
   const [customHint, setCustomHint] = useState(DEFAULT_CUSTOM_HINT);
+  const [customPlaceholder, setCustomPlaceholder] = useState("e.g. octagon");
   const [cameraDockMetrics, setCameraDockMetrics] = useState({
     left: 24,
     top: 24,
@@ -296,6 +298,44 @@ export default function AetherParticles() {
     } catch {
       setIsGuideOpen(true);
     }
+  }, []);
+
+  useEffect(() => {
+    let exampleIndex = 0;
+    let characterIndex = 0;
+    let deleting = false;
+    let timeoutId;
+
+    const tick = () => {
+      const example = CUSTOM_PLACEHOLDER_EXAMPLES[exampleIndex];
+
+      if (!deleting) {
+        characterIndex += 1;
+        setCustomPlaceholder(`e.g. ${example.slice(0, characterIndex)}`);
+
+        if (characterIndex === example.length) {
+          deleting = true;
+          timeoutId = window.setTimeout(tick, 1200);
+          return;
+        }
+      } else {
+        characterIndex -= 1;
+        setCustomPlaceholder(`e.g. ${example.slice(0, characterIndex)}`);
+
+        if (characterIndex === 0) {
+          deleting = false;
+          exampleIndex = (exampleIndex + 1) % CUSTOM_PLACEHOLDER_EXAMPLES.length;
+        }
+      }
+
+      timeoutId = window.setTimeout(tick, deleting ? 50 : 90);
+    };
+
+    timeoutId = window.setTimeout(tick, 500);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
   }, []);
 
   useEffect(() => {
@@ -817,26 +857,6 @@ export default function AetherParticles() {
 
         <div className={styles.panelBody}>
           <div className={styles.block}>
-            <span className={styles.label}>Custom Preset</span>
-            <form className={styles.searchPanel} onSubmit={handleCustomPresetSubmit}>
-              <div className={styles.searchRow}>
-                <input
-                  type="search"
-                  value={customPrompt}
-                  onChange={(event) => setCustomPrompt(event.target.value)}
-                  className={styles.searchInput}
-                  placeholder="Type a shape, e.g. octagon or circle"
-                  aria-label="Create a custom particle shape"
-                />
-                <button type="submit" className={styles.searchButton}>
-                  Create
-                </button>
-              </div>
-              <p className={styles.searchHint}>{customHint}</p>
-            </form>
-          </div>
-
-          <div className={styles.block}>
             <span className={styles.label}>Shape Template</span>
             <div className={styles.presetGrid}>
               {presetSections.map((section, sectionIndex) => (
@@ -866,6 +886,27 @@ export default function AetherParticles() {
                 </div>
               ))}
             </div>
+          </div>
+
+          <div className={styles.block}>
+            <span className={styles.label}>Custom Preset</span>
+            <form className={styles.searchPanel} onSubmit={handleCustomPresetSubmit}>
+              <div className={styles.searchRow}>
+                <input
+                  type="search"
+                  value={customPrompt}
+                  onChange={(event) => setCustomPrompt(event.target.value)}
+                  className={styles.searchInput}
+                  placeholder={customPlaceholder}
+                  aria-label="Create a custom particle shape"
+                />
+                <button type="submit" className={styles.searchButton} aria-label="Generate preset">
+                  <span className={styles.searchButtonIcon} aria-hidden="true">
+                    ✨
+                  </span>
+                </button>
+              </div>
+            </form>
           </div>
 
           <div className={styles.block}>
