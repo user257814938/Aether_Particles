@@ -12,7 +12,7 @@ const { Hands } = handsPackage;
 // - `icon` supports faster visual recognition in the sidebar
 // - `rotation` decides whether the shape can tilt vertically or should stay front-facing
 const PRESETS = {
-  sphere: { label: "Sphere", color: "#2563eb", icon: "\u25CF", rotation: "full" },
+  sphere: { label: "Sphere", color: "#2563eb", icon: "\u25CF", rotation: "sphereFull" },
   heart: { label: "Heart", color: "#dc2626", icon: "\u2665", rotation: "heartDrift" },
   saturn: { label: "Saturn", color: "#caa46b", icon: "\u{1FA90}", rotation: "side" },
   buddha: { label: "Buddha", color: "#b7791f", icon: "\u2638", rotation: "heartDrift" },
@@ -581,7 +581,11 @@ export default function AetherParticles() {
           : PRESETS[activePresetRef.current].rotation;
       const time = performance.now() * 0.001;
 
-      if (rotationMode === "full") {
+      if (rotationMode === "sphereFull") {
+        particles.rotation.y += 0.0022;
+        particles.rotation.x += 0.0011;
+        particles.rotation.z += (0 - particles.rotation.z) * 0.08;
+      } else if (rotationMode === "full") {
         particles.rotation.y += 0.002;
         particles.rotation.x += 0.001;
         particles.rotation.z += (0 - particles.rotation.z) * 0.08;
@@ -1361,7 +1365,7 @@ function triangleArea(a, b, c) {
 
 function createSpherePositions(particleCount) {
   const targetPositions = new Float32Array(particleCount * 3);
-  const radius = 5;
+  const radius = 7.5;
 
   for (let index = 0; index < particleCount; index += 1) {
     const offset = index * 3;
