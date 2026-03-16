@@ -200,6 +200,7 @@ export default function AetherParticles() {
   const [preloaderProgress, setPreloaderProgress] = useState(0);
   // The onboarding guide opens only on the first visit, then remains user-controlled via the left panel.
   const [isGuideOpen, setIsGuideOpen] = useState(false);
+  const currentYear = new Date().getFullYear();
 
   const presetSections = PRESET_SECTIONS.map((section) =>
     section.map((key) => [key, PRESETS[key]]),
@@ -1050,6 +1051,27 @@ export default function AetherParticles() {
               <span className={styles.guideLegendIcon}>{"\u270B"}</span>
               <span>Open hand: high meter, expanded particles.</span>
             </div>
+          </div>
+
+          <div className={styles.guideFooter}>
+            <p className={styles.guideMetaLead}>
+              Contact us{" "}
+              <a className={styles.guideLink} href="mailto:brian@osso.website">
+                brian@osso.website
+              </a>
+            </p>
+            <p className={styles.guideMetaText}>
+              Built by{" "}
+              <a
+                className={styles.guideLink}
+                href="https://osso.website"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Osso Website
+              </a>
+            </p>
+            <p className={styles.guideCopyright}>© {currentYear} aether</p>
           </div>
 
           <div className={styles.guideActions}>
