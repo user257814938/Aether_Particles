@@ -631,8 +631,8 @@ export default function AetherParticles() {
         particles.rotation.y += (targetY - particles.rotation.y) * 0.08;
         particles.rotation.z += 0.0022;
       } else if (rotationMode === "galaxyTilt") {
-        const targetX = 1.72 + Math.sin(time * 0.56) * 0.62;
-        const targetY = Math.cos(time * 0.44) * 0.18;
+        const targetX = 1.72 + Math.sin(time * 0.26125) * 0.62;
+        const targetY = Math.cos(time * 0.198) * 0.18;
         particles.rotation.x += (targetX - particles.rotation.x) * 0.08;
         particles.rotation.y += (targetY - particles.rotation.y) * 0.08;
         particles.rotation.z += (0 - particles.rotation.z) * 0.08;
@@ -1593,6 +1593,7 @@ function createFireworksPositions(particleCount) {
 function createSupernovaData(particleCount) {
   const positions = new Float32Array(particleCount * 3);
   const colors = new Float32Array(particleCount * 3);
+  const scale = 1.125;
   const coreColor = new THREE.Color("#ffe7b3");
   const warmCoreColor = new THREE.Color("#ffb58e");
   const haloColor = new THREE.Color("#f3f8ff");
@@ -1611,19 +1612,19 @@ function createSupernovaData(particleCount) {
     let radiusRatio;
 
     if (branch < 0.24) {
-      const radius = Math.pow(Math.random(), 1.85) * 1.9;
-      const angle = Math.random() * Math.PI * 2;
-      x = Math.cos(angle) * radius * 1.08 + (Math.random() - 0.5) * 0.16;
-      y = Math.sin(angle) * radius * 0.72 + (Math.random() - 0.5) * 0.14;
-      z = (Math.random() - 0.5) * 0.34;
+        const radius = Math.pow(Math.random(), 1.85) * 1.9 * scale;
+        const angle = Math.random() * Math.PI * 2;
+        x = Math.cos(angle) * radius * 1.08 + (Math.random() - 0.5) * 0.16;
+        y = Math.sin(angle) * radius * 0.72 + (Math.random() - 0.5) * 0.14;
+        z = (Math.random() - 0.5) * 0.34;
       radiusRatio = radius / 8.2;
       color.copy(coreColor).lerp(warmCoreColor, Math.random() * 0.45);
     } else if (branch < 0.68) {
-      const radius = lerp(0.7, 7.6, Math.pow(Math.random(), 0.62));
-      const angle = Math.random() * Math.PI * 2;
-      x = Math.cos(angle) * radius * 1.42 + (Math.random() - 0.5) * 0.3;
-      y = Math.sin(angle) * radius * 0.82 + (Math.random() - 0.5) * 0.26;
-      z = (Math.random() - 0.5) * (0.18 + radius * 0.065);
+        const radius = lerp(0.7, 7.6, Math.pow(Math.random(), 0.62)) * scale;
+        const angle = Math.random() * Math.PI * 2;
+        x = Math.cos(angle) * radius * 1.42 + (Math.random() - 0.5) * 0.3;
+        y = Math.sin(angle) * radius * 0.82 + (Math.random() - 0.5) * 0.26;
+        z = (Math.random() - 0.5) * (0.18 + radius * 0.065);
       radiusRatio = radius / 8.2;
       color.copy(haloColor).lerp(armColor, radiusRatio * 0.7);
       if (Math.random() < 0.18) {
@@ -1631,10 +1632,10 @@ function createSupernovaData(particleCount) {
       }
     } else {
       const armIndex = Math.floor(Math.random() * 4);
-      const radius = lerp(0.9, 8.2, Math.pow(Math.random(), 0.55));
-      const twist = radius * 0.88;
-      const angle =
-        (armIndex / 4) * Math.PI * 2 +
+        const radius = lerp(0.9, 8.2, Math.pow(Math.random(), 0.55)) * scale;
+        const twist = radius * 0.88;
+        const angle =
+          (armIndex / 4) * Math.PI * 2 +
         twist +
         (Math.random() - 0.5) * (0.14 + radius * 0.018);
       const width = (Math.random() - 0.5) * (0.2 + radius * 0.12);
