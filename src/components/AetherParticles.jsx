@@ -15,7 +15,7 @@ const PRESETS = {
   sphere: { label: "Sphere", color: "#2563eb", icon: "\u25CF", rotation: "full" },
   heart: { label: "Heart", color: "#dc2626", icon: "\u2665", rotation: "heartDrift" },
   saturn: { label: "Saturn", color: "#caa46b", icon: "\u{1FA90}", rotation: "side" },
-  buddha: { label: "Buddha", color: "#b7791f", icon: "\u2638", rotation: "drift" },
+  buddha: { label: "Buddha", color: "#b7791f", icon: "\u2638", rotation: "heartDrift" },
   flower: { label: "Flower", color: "#e11d48", icon: "\u273F", rotation: "lotusSweep" },
   lotus: { label: "Lotus", color: "#ec4899", icon: "\u{1FAB7}", rotation: "lotusSweep" },
   fireworks: { label: "Fireworks", color: "#b91c1c", icon: "\u2726", rotation: "full" },
@@ -1522,7 +1522,7 @@ function createLotusPositions(particleCount) {
 
 // Buddha is sampled from a 2D silhouette mask, then extruded slightly in depth to preserve the figure.
 function createBuddhaPositions(particleCount) {
-  return sampleMaskShape(
+  const positions = sampleMaskShape(
     particleCount,
     [-1.32, 1.32],
     [-1.46, 1.5],
@@ -1532,6 +1532,13 @@ function createBuddhaPositions(particleCount) {
       return (Math.random() - 0.5) * 0.14 + centered * 0.28;
     },
   );
+
+  // Buddha mirrors the heart tuning here: +50% global size with the same motion profile.
+  for (let index = 0; index < positions.length; index += 1) {
+    positions[index] *= 1.5;
+  }
+
+  return positions;
 }
 
 function createFireworksPositions(particleCount) {
