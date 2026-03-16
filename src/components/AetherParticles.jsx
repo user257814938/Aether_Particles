@@ -17,7 +17,7 @@ const PRESETS = {
   saturn: { label: "Saturn", color: "#caa46b", icon: "\u{1FA90}", rotation: "side" },
   buddha: { label: "Buddha", color: "#b7791f", icon: "\u2638", rotation: "heartDrift" },
   flower: { label: "Flower", color: "#e11d48", icon: "\u273F", rotation: "heartDrift" },
-  lotus: { label: "Lotus", color: "#ec4899", icon: "\u{1FAB7}", rotation: "lotusSweep" },
+  lotus: { label: "Lotus", color: "#ec4899", icon: "\u{1FAB7}", rotation: "lotusUpperFull" },
   fireworks: { label: "Fireworks", color: "#b91c1c", icon: "\u2726", rotation: "full" },
   supernova: { label: "Supernova", color: "#8b5cf6", icon: "\u273A", rotation: "galaxyTilt" },
   cube: { label: "Cube", color: "#14b8a6", icon: "\u25A3", rotation: "full" },
@@ -182,6 +182,9 @@ export default function AetherParticles() {
   const mediaStreamRef = useRef(null);
   const lastVideoTimeRef = useRef(-1);
   const handRequestInFlightRef = useRef(false);
+  const rotationDirectionRef = useRef({
+    lotusUpperFull: Math.random() < 0.5 ? -1 : 1,
+  });
   const currentExpansionRef = useRef(0.5);
   const targetExpansionRef = useRef(0.5);
   const colorTargetRef = useRef(new THREE.Color(PRESETS[DEFAULT_PRESET].color));
@@ -582,6 +585,12 @@ export default function AetherParticles() {
         particles.rotation.y += 0.002;
         particles.rotation.x += 0.001;
         particles.rotation.z += (0 - particles.rotation.z) * 0.08;
+      } else if (rotationMode === "lotusUpperFull") {
+        // Lotus can orbit freely sideways, but its vertical sweep stays above the underside.
+        const targetX = 0.42 + Math.sin(time * 0.78) * 0.42;
+        particles.rotation.x += (targetX - particles.rotation.x) * 0.08;
+        particles.rotation.y += 0.002 * rotationDirectionRef.current.lotusUpperFull;
+        particles.rotation.z += (0 - particles.rotation.z) * 0.08;
       } else if (rotationMode === "lotusSweep") {
         const targetX = -0.2 + Math.cos(time * 0.42) * 0.025;
         const targetY = (Math.sin(time * 0.42) * 0.5 + 0.5) * 1.12;
@@ -791,6 +800,9 @@ export default function AetherParticles() {
 
   const handlePresetChange = (nextPreset) => {
     customManifestRef.current = null;
+    if (PRESETS[nextPreset]?.rotation === "lotusUpperFull") {
+      rotationDirectionRef.current.lotusUpperFull = Math.random() < 0.5 ? -1 : 1;
+    }
     setPreset(nextPreset);
     setParticleColor(PRESETS[nextPreset].color);
     const nextUrl = new URL(window.location.href);
@@ -1516,6 +1528,10 @@ function createLotusPositions(particleCount) {
     targetPositions[offset] = volumeX;
     targetPositions[offset + 1] = volumeY;
     targetPositions[offset + 2] = volumeZ;
+  }
+
+  for (let index = 0; index < targetPositions.length; index += 1) {
+    targetPositions[index] *= 1.5;
   }
 
   return targetPositions;
