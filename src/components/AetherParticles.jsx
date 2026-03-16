@@ -39,6 +39,7 @@ const DEFAULT_STATUS = {
 };
 const GUIDE_STORAGE_KEY = "aether-guide-dismissed";
 const DEFAULT_PRESET = "heart";
+const ENABLE_PRELOADER = true;
 const DEFAULT_CUSTOM_HINT = "Try octagon, circle, hexagon, triangle, star, or spiral.";
 const CUSTOM_PLACEHOLDER_EXAMPLES = ["octagon", "circle", "hexagon", "triangle", "star", "spiral"];
 const CUSTOM_SHAPE_LIBRARY = {
@@ -195,13 +196,8 @@ export default function AetherParticles() {
   const [customPrompt, setCustomPrompt] = useState("");
   const [customHint, setCustomHint] = useState(DEFAULT_CUSTOM_HINT);
   const [customPlaceholder, setCustomPlaceholder] = useState("e.g. octagon");
-  const [isPreloaderVisible, setIsPreloaderVisible] = useState(true);
+  const [isPreloaderVisible, setIsPreloaderVisible] = useState(ENABLE_PRELOADER);
   const [preloaderProgress, setPreloaderProgress] = useState(0);
-  const [cameraDockMetrics, setCameraDockMetrics] = useState({
-    left: 24,
-    top: 24,
-    width: 356,
-  });
   // The onboarding guide opens only on the first visit, then remains user-controlled via the left panel.
   const [isGuideOpen, setIsGuideOpen] = useState(false);
 
@@ -303,16 +299,21 @@ export default function AetherParticles() {
   }, []);
 
   useEffect(() => {
+    if (!ENABLE_PRELOADER) {
+      return undefined;
+    }
+
     const duration = 2400;
     const start = performance.now();
     let frameId = 0;
 
     const tick = (timestamp) => {
       const elapsed = Math.min(timestamp - start, duration);
-      const nextProgress = Math.round((elapsed / duration) * 100);
+      const nextProgress = (elapsed / duration) * 100;
       setPreloaderProgress(nextProgress);
 
       if (elapsed >= duration) {
+        setPreloaderProgress(100);
         setIsPreloaderVisible(false);
         return;
       }
@@ -365,41 +366,6 @@ export default function AetherParticles() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!panelRef.current) {
-      return undefined;
-    }
-
-    const updateMetrics = () => {
-      const panel = panelRef.current;
-
-      if (!panel) {
-        return;
-      }
-
-      const rect = panel.getBoundingClientRect();
-      setCameraDockMetrics({
-        left: rect.left,
-        top: rect.bottom + 16,
-        width: rect.width,
-      });
-    };
-
-    updateMetrics();
-
-    const resizeObserver = new ResizeObserver(() => {
-      updateMetrics();
-    });
-
-    resizeObserver.observe(panelRef.current);
-    window.addEventListener("resize", updateMetrics);
-
-    return () => {
-      resizeObserver.disconnect();
-      window.removeEventListener("resize", updateMetrics);
-    };
-  }, []);
-
   const closeGuide = () => {
     setIsGuideOpen(false);
 
@@ -425,7 +391,6 @@ export default function AetherParticles() {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x000000);
 
     const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
     camera.position.z = 15;
@@ -845,178 +810,183 @@ export default function AetherParticles() {
 
   const forcePercent = Math.round(forceLevel * 100);
   const showStatusNote = status.tone === "error";
-  const cameraDockStyle = useMemo(
-    () => ({
-      left: `${cameraDockMetrics.left}px`,
-      top: `${cameraDockMetrics.top}px`,
-      width: `${cameraDockMetrics.width}px`,
-    }),
-    [cameraDockMetrics],
-  );
 
   return (
     <main className={styles.page}>
       <canvas ref={canvasRef} className={styles.canvas} />
 
-      <div
-        className={`${styles.preloader} ${
-          isPreloaderVisible ? styles.preloaderVisible : styles.preloaderHidden
-        }`}
-        aria-hidden={!isPreloaderVisible}
-      >
-        <div className={styles.preloaderCard}>
-          <AetherLogo className={styles.preloaderLogo} />
-          <p className={styles.preloaderTitle}>aether</p>
-          <p className={styles.preloaderText}>Shaping particles in real time</p>
-          <div className={styles.preloaderMeter} aria-live="polite">
-            <span className={styles.preloaderSlash}>/</span>
-            <span className={styles.preloaderProgress}>{preloaderProgress}</span>
-          </div>
-        </div>
-      </div>
-
-      <section ref={panelRef} className={styles.panel}>
-        <div className={styles.panelHeader}>
-          <div className={styles.brand}>
-            <a
-              href="/"
-              className={styles.logoLink}
-              aria-label="Go to homepage"
-              onClick={handleLogoReset}
-            >
-              <AetherLogo className={styles.logo} />
-            </a>
-            <div>
-              <h1 className={styles.title}>aether</h1>
-              <p className={styles.description}>Gesture-reactive particle sculpture</p>
-            </div>
-          </div>
-        </div>
-
-        {showStatusNote ? (
-          <p className={styles.status} data-tone={status.tone}>
-            {status.text}
-          </p>
-        ) : null}
-
-        <div className={styles.panelBody}>
-          <div className={styles.block}>
-            <span className={styles.label}>Shape Template</span>
-            <div className={styles.presetGrid}>
-              {presetSections.map((section, sectionIndex) => (
-                <div key={`section-${sectionIndex}`} className={styles.presetGroup}>
-                  <div className={styles.presetSection}>
-                    {section.map(([key, value]) => (
-                      <button
-                        key={key}
-                        type="button"
-                      onClick={() => handlePresetChange(key)}
-                      className={styles.presetButton}
-                      data-active={preset === key}
-                      style={
-                        preset === key
-                          ? { "--active-preset-color": value.color }
-                          : undefined
-                      }
-                    >
-                        <span className={styles.presetIcon} aria-hidden="true">
-                          {value.icon}
-                        </span>
-                        <span className={styles.presetLabel}>{value.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                  <div className={styles.presetDivider} aria-hidden="true" />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className={styles.block}>
-            <span className={styles.label}>Custom Preset</span>
-            <form className={styles.searchPanel} onSubmit={handleCustomPresetSubmit}>
-              <div className={styles.searchRow}>
-                <input
-                  type="search"
-                  value={customPrompt}
-                  onChange={(event) => setCustomPrompt(event.target.value)}
-                  className={styles.searchInput}
-                  placeholder={customPlaceholder}
-                  aria-label="Create a custom particle shape"
-                />
-                <button type="submit" className={styles.searchButton} aria-label="Generate preset">
-                  <span className={styles.searchButtonIcon} aria-hidden="true">
-                    ✨
-                  </span>
-                </button>
-              </div>
-            </form>
-          </div>
-
-          <div className={styles.block}>
-            <label htmlFor="particle-color" className={styles.label}>
-              Custom Tools
-            </label>
-            <div className={styles.colorCard}>
-              <label htmlFor="particle-color" className={styles.colorControl}>
-                <span
-                  className={styles.colorPreview}
-                  style={{ "--preview-color": particleColor }}
-                />
-                <span className={styles.colorMeta}>
-                  <span className={styles.colorValue}>{particleColor.toUpperCase()}</span>
-                </span>
-                <input
-                  id="particle-color"
-                  type="color"
-                  value={particleColor}
-                  onChange={(event) => setParticleColor(event.target.value)}
-                  className={styles.colorInput}
-                />
-              </label>
-            </div>
-          </div>
-
-          <div className={styles.block}>
-            <span className={styles.label}>Meter</span>
-            <div className={styles.sidebarMeter}>
-              <div className={styles.forceMeter}>
-                <span className={styles.forceIcon} aria-hidden="true">
-                  {"\u270A"}
-                </span>
-
-                <div className={styles.forceTrack} aria-label="Hand openness force meter">
-                  <div className={styles.forceFill} style={{ width: `${forcePercent}%` }} />
-                  <div className={styles.forceThumb} style={{ left: `${forcePercent}%` }} />
-                </div>
-
-                <span className={styles.forceIcon} aria-hidden="true">
-                  {"\u270B"}
-                </span>
-              </div>
-            </div>
-          </div>
-
-        </div>
-
-        <div className={styles.guideBlock}>
-          <span className={styles.label}>Guide</span>
-          <button
-          type="button"
-          className={styles.helpButton}
-          onClick={() => setIsGuideOpen(true)}
+      {ENABLE_PRELOADER ? (
+        <div
+          className={`${styles.preloader} ${
+            isPreloaderVisible ? styles.preloaderVisible : styles.preloaderHidden
+          }`}
+          aria-hidden={!isPreloaderVisible}
         >
-          <span className={styles.helpButtonIcon} aria-hidden="true">
-            {"\u2197"}
-          </span>
-          <span className={styles.helpButtonText}>How to use the system</span>
-          </button>
+          <div className={styles.preloaderCard}>
+            <AetherLogo className={styles.preloaderLogo} />
+            <p className={styles.preloaderTitle}>aether</p>
+            <p className={styles.preloaderText}>Shaping particles in real time</p>
+            <div className={styles.preloaderMeter} aria-live="polite">
+              <span className={styles.preloaderSlash}>/</span>
+              <span className={styles.preloaderProgress}>{Math.round(preloaderProgress)}</span>
+            </div>
+          </div>
         </div>
-      </section>
+      ) : null}
 
-      <div className={styles.cameraDock} style={cameraDockStyle}>
-        <div className={styles.cameraWrap}>
-          <video ref={previewVideoRef} className={styles.previewVideo} autoPlay playsInline muted />
+      <div className={styles.leftRail}>
+        <section ref={panelRef} className={styles.panel}>
+          <div className={styles.panelHeader}>
+            <div className={styles.brand}>
+              <a
+                href="/"
+                className={styles.logoLink}
+                aria-label="Go to homepage"
+                onClick={handleLogoReset}
+              >
+                <AetherLogo className={styles.logo} />
+              </a>
+              <div>
+                <h1 className={styles.title}>aether</h1>
+                <p className={styles.description}>Gesture-reactive particle sculpture</p>
+              </div>
+            </div>
+          </div>
+
+          {showStatusNote ? (
+            <p className={styles.status} data-tone={status.tone}>
+              {status.text}
+            </p>
+          ) : null}
+
+          <div className={styles.panelBody}>
+            <div className={styles.block}>
+              <span className={styles.label}>Shape Template</span>
+              <div className={styles.presetGrid}>
+                {presetSections.map((section, sectionIndex) => (
+                  <div key={`section-${sectionIndex}`} className={styles.presetGroup}>
+                    <div className={styles.presetSection}>
+                      {section.map(([key, value]) => (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => handlePresetChange(key)}
+                          className={styles.presetButton}
+                          data-active={preset === key}
+                          style={
+                            preset === key
+                              ? { "--active-preset-color": value.color }
+                              : undefined
+                          }
+                        >
+                          <span className={styles.presetIcon} aria-hidden="true">
+                            {value.icon}
+                          </span>
+                          <span className={styles.presetLabel}>{value.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <div className={styles.presetDivider} aria-hidden="true" />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className={styles.block}>
+              <span className={styles.label}>Custom Preset</span>
+              <form className={styles.searchPanel} onSubmit={handleCustomPresetSubmit}>
+                <div className={styles.searchRow}>
+                  <input
+                    type="search"
+                    value={customPrompt}
+                    onChange={(event) => setCustomPrompt(event.target.value)}
+                    className={styles.searchInput}
+                    placeholder={customPlaceholder}
+                    aria-label="Create a custom particle shape"
+                  />
+                  <button
+                    type="submit"
+                    className={styles.searchButton}
+                    aria-label="Generate preset"
+                  >
+                    <span className={styles.searchButtonIcon} aria-hidden="true">
+                      ✨
+                    </span>
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <div className={styles.block}>
+              <label htmlFor="particle-color" className={styles.label}>
+                Custom Tools
+              </label>
+              <div className={styles.colorCard}>
+                <label htmlFor="particle-color" className={styles.colorControl}>
+                  <span
+                    className={styles.colorPreview}
+                    style={{ "--preview-color": particleColor }}
+                  />
+                  <span className={styles.colorMeta}>
+                    <span className={styles.colorValue}>{particleColor.toUpperCase()}</span>
+                  </span>
+                  <input
+                    id="particle-color"
+                    type="color"
+                    value={particleColor}
+                    onChange={(event) => setParticleColor(event.target.value)}
+                    className={styles.colorInput}
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div className={styles.block}>
+              <span className={styles.label}>Meter</span>
+              <div className={styles.sidebarMeter}>
+                <div className={styles.forceMeter}>
+                  <span className={styles.forceIcon} aria-hidden="true">
+                    {"\u270A"}
+                  </span>
+
+                  <div className={styles.forceTrack} aria-label="Hand openness force meter">
+                    <div className={styles.forceFill} style={{ width: `${forcePercent}%` }} />
+                    <div className={styles.forceThumb} style={{ left: `${forcePercent}%` }} />
+                  </div>
+
+                  <span className={styles.forceIcon} aria-hidden="true">
+                    {"\u270B"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className={styles.guideBlock}>
+            <span className={styles.label}>Guide</span>
+            <button
+              type="button"
+              className={styles.helpButton}
+              onClick={() => setIsGuideOpen(true)}
+            >
+              <span className={styles.helpButtonIcon} aria-hidden="true">
+                {"\u2197"}
+              </span>
+              <span className={styles.helpButtonText}>How to use the system</span>
+            </button>
+          </div>
+        </section>
+
+        <div className={styles.cameraDock}>
+          <div className={styles.cameraWrap}>
+            <video
+              ref={previewVideoRef}
+              className={styles.previewVideo}
+              autoPlay
+              playsInline
+              muted
+            />
+          </div>
         </div>
       </div>
 
