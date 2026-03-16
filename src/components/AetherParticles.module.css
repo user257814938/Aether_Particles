@@ -17,6 +17,86 @@
   display: block;
 }
 
+.preloader {
+  position: fixed;
+  inset: 0;
+  z-index: 6;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at top, rgba(59, 130, 246, 0.16), transparent 28%),
+    rgba(2, 5, 10, 0.94);
+  backdrop-filter: blur(12px);
+  transition:
+    opacity 260ms ease,
+    visibility 260ms ease;
+}
+
+.preloaderVisible {
+  opacity: 1;
+  visibility: visible;
+}
+
+.preloaderHidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.preloaderCard {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+}
+
+.preloaderLogo {
+  width: 64px;
+  height: 64px;
+}
+
+.preloaderTitle {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 2.8rem);
+  line-height: 1;
+  text-transform: lowercase;
+  background: linear-gradient(90deg, #dbeafe, #7dd3fc 42%, #f5d0fe 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.preloaderText {
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.58);
+}
+
+.preloaderMeter {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.preloaderSlash {
+  font-size: clamp(1.35rem, 3vw, 1.8rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: rgba(125, 211, 252, 0.84);
+}
+
+.preloaderProgress {
+  font-size: clamp(1.35rem, 3vw, 1.8rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: rgba(125, 211, 252, 0.84);
+}
+
 .panel {
   position: fixed;
   top: 24px;
@@ -126,6 +206,81 @@
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.46);
+}
+
+.searchPanel {
+  display: grid;
+  gap: 10px;
+}
+
+.searchRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.searchInput,
+.searchButton {
+  min-height: 44px;
+  border-radius: 14px;
+  border: 2px solid rgba(125, 211, 252, 0.5);
+  background: transparent;
+  color: #fff;
+  box-shadow:
+    inset 0 0 0 1px rgba(244, 114, 182, 0.08),
+    0 0 0 rgba(0, 0, 0, 0);
+}
+
+.searchInput {
+  width: 100%;
+  padding: 0 14px;
+  font-size: 13px;
+  outline: none;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.searchInput::placeholder {
+  color: rgba(255, 255, 255, 0.34);
+}
+
+.searchInput:focus {
+  border-color: rgba(125, 211, 252, 0.82);
+  box-shadow:
+    inset 0 0 0 1px rgba(244, 114, 182, 0.18),
+    0 0 18px rgba(96, 165, 250, 0.16);
+}
+
+.searchButton {
+  min-width: 50px;
+  padding: 0 14px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.searchButton:hover {
+  transform: translateY(-2px);
+  border-color: rgba(125, 211, 252, 0.82);
+  box-shadow:
+    inset 0 0 0 1px rgba(244, 114, 182, 0.18),
+    0 0 18px rgba(96, 165, 250, 0.18);
+}
+
+.searchButtonIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  line-height: 1;
+  letter-spacing: -0.05em;
 }
 
 /* Preset chooser follows the custom storytelling order defined in the component. */
@@ -583,6 +738,7 @@
     transform: scale(1);
   }
 }
+
 
 @media (max-width: 768px) {
   .panel {

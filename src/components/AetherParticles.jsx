@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import handsPackage from "@mediapipe/hands";
 import styles from "./AetherParticles.module.css";
@@ -38,6 +38,136 @@ const DEFAULT_STATUS = {
   text: "Allow camera access to control the sculpture with your hand.",
 };
 const GUIDE_STORAGE_KEY = "aether-guide-dismissed";
+const DEFAULT_PRESET = "heart";
+const DEFAULT_CUSTOM_HINT = "Try octagon, circle, hexagon, triangle, star, or spiral.";
+const CUSTOM_PLACEHOLDER_EXAMPLES = ["octagon", "circle", "hexagon", "triangle", "star", "spiral"];
+const CUSTOM_SHAPE_LIBRARY = {
+  circle: {
+    slug: "circle",
+    label: "Circle",
+    color: "#38bdf8",
+    rotation: "drift",
+    type: "circle",
+    radius: 5.2,
+    depth: 0.22,
+    fillRatio: 0.28,
+  },
+  octagon: {
+    slug: "octagon",
+    label: "Octagon",
+    color: "#60a5fa",
+    rotation: "drift",
+    type: "polygon",
+    sides: 8,
+    radius: 5.2,
+    depth: 0.26,
+    fillRatio: 0.26,
+  },
+  hexagon: {
+    slug: "hexagon",
+    label: "Hexagon",
+    color: "#14b8a6",
+    rotation: "drift",
+    type: "polygon",
+    sides: 6,
+    radius: 5,
+    depth: 0.26,
+    fillRatio: 0.24,
+  },
+  triangle: {
+    slug: "triangle",
+    label: "Triangle",
+    color: "#f97316",
+    rotation: "drift",
+    type: "polygon",
+    sides: 3,
+    radius: 5.4,
+    depth: 0.24,
+    fillRatio: 0.18,
+  },
+  diamond: {
+    slug: "diamond",
+    label: "Diamond",
+    color: "#f43f5e",
+    rotation: "drift",
+    type: "polygon",
+    sides: 4,
+    radius: 5.2,
+    depth: 0.22,
+    fillRatio: 0.2,
+    rotationOffset: Math.PI / 4,
+  },
+  star: {
+    slug: "star",
+    label: "Star",
+    color: "#facc15",
+    rotation: "drift",
+    type: "star",
+    points: 5,
+    outerRadius: 5.3,
+    innerRadius: 2.2,
+    depth: 0.24,
+    fillRatio: 0.2,
+  },
+  spiral: {
+    slug: "spiral",
+    label: "Spiral",
+    color: "#a78bfa",
+    rotation: "lotusSweep",
+    type: "spiral",
+    turns: 4.5,
+    radius: 5.4,
+    depth: 0.3,
+  },
+};
+const CUSTOM_SHAPE_ALIASES = {
+  circle: "circle",
+  round: "circle",
+  rond: "circle",
+  cercle: "circle",
+  octagon: "octagon",
+  octogone: "octagon",
+  hexagon: "hexagon",
+  hexagone: "hexagon",
+  triangle: "triangle",
+  diamond: "diamond",
+  losange: "diamond",
+  star: "star",
+  etoile: "star",
+  spiral: "spiral",
+  spirale: "spiral",
+};
+
+function normalizePresetKey(value) {
+  if (!value) {
+    return null;
+  }
+
+  const normalizedValue = value.toLowerCase();
+  return normalizedValue === "custom" || Object.hasOwn(PRESETS, normalizedValue)
+    ? normalizedValue
+    : null;
+}
+
+function normalizeCustomShapeKey(value) {
+  if (!value) {
+    return "";
+  }
+
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function resolveCustomShape(value) {
+  const normalizedValue = normalizeCustomShapeKey(value);
+  const slug = CUSTOM_SHAPE_ALIASES[normalizedValue];
+  return slug ? CUSTOM_SHAPE_LIBRARY[slug] : null;
+}
 
 export default function AetherParticles() {
   const panelRef = useRef(null);
@@ -53,14 +183,20 @@ export default function AetherParticles() {
   const handRequestInFlightRef = useRef(false);
   const currentExpansionRef = useRef(0.5);
   const targetExpansionRef = useRef(0.5);
-  const colorTargetRef = useRef(new THREE.Color(PRESETS.heart.color));
+  const colorTargetRef = useRef(new THREE.Color(PRESETS[DEFAULT_PRESET].color));
   const particleCountRef = useRef(0);
   const mountedRef = useRef(false);
-  const activePresetRef = useRef("heart");
-  const [preset, setPreset] = useState("heart");
-  const [particleColor, setParticleColor] = useState(PRESETS.heart.color);
+  const activePresetRef = useRef(DEFAULT_PRESET);
+  const customManifestRef = useRef(null);
+  const [preset, setPreset] = useState(DEFAULT_PRESET);
+  const [particleColor, setParticleColor] = useState(PRESETS[DEFAULT_PRESET].color);
   const [status, setStatus] = useState(DEFAULT_STATUS);
   const [forceLevel, setForceLevel] = useState(0);
+  const [customPrompt, setCustomPrompt] = useState("");
+  const [customHint, setCustomHint] = useState(DEFAULT_CUSTOM_HINT);
+  const [customPlaceholder, setCustomPlaceholder] = useState("e.g. octagon");
+  const [isPreloaderVisible, setIsPreloaderVisible] = useState(true);
+  const [preloaderProgress, setPreloaderProgress] = useState(0);
   const [cameraDockMetrics, setCameraDockMetrics] = useState({
     left: 24,
     top: 24,
@@ -76,6 +212,12 @@ export default function AetherParticles() {
   useEffect(() => {
     activePresetRef.current = preset;
     if (particleCountRef.current > 0) {
+      if (preset === "custom" && customManifestRef.current) {
+        targetPositionsRef.current = customManifestRef.current.positions;
+        targetColorsRef.current = createSolidColors(particleCountRef.current, particleColor);
+        return;
+      }
+
       const presetData = buildPresetData(
         preset,
         particleCountRef.current,
@@ -84,11 +226,52 @@ export default function AetherParticles() {
       targetPositionsRef.current = presetData.positions;
       targetColorsRef.current = presetData.colors;
     }
-  }, [preset]);
+  }, [particleColor, preset]);
+
+  useLayoutEffect(() => {
+    const syncPresetFromUrl = () => {
+      const searchParams = new URLSearchParams(window.location.search);
+      const nextPreset = normalizePresetKey(searchParams.get("preset")) ?? DEFAULT_PRESET;
+
+      if (nextPreset === "custom") {
+        const shapeKey = searchParams.get("shape");
+
+        if (shapeKey && applyCustomPreset(shapeKey, false, false)) {
+          return;
+        }
+
+        setPreset(DEFAULT_PRESET);
+        setParticleColor(PRESETS[DEFAULT_PRESET].color);
+        activePresetRef.current = DEFAULT_PRESET;
+        colorTargetRef.current.set(PRESETS[DEFAULT_PRESET].color);
+        customManifestRef.current = null;
+        setCustomPrompt("");
+        setCustomHint(DEFAULT_CUSTOM_HINT);
+        return;
+      }
+
+      setPreset(nextPreset);
+      setParticleColor(PRESETS[nextPreset].color);
+      activePresetRef.current = nextPreset;
+      colorTargetRef.current.set(PRESETS[nextPreset].color);
+    };
+
+    syncPresetFromUrl();
+    window.addEventListener("popstate", syncPresetFromUrl);
+
+    return () => {
+      window.removeEventListener("popstate", syncPresetFromUrl);
+    };
+  }, []);
 
   useEffect(() => {
     colorTargetRef.current.set(particleColor);
     if (particleCountRef.current > 0 && activePresetRef.current !== "supernova") {
+      if (activePresetRef.current === "custom") {
+        targetColorsRef.current = createSolidColors(particleCountRef.current, particleColor);
+        return;
+      }
+
       targetColorsRef.current = buildPresetColors(
         activePresetRef.current,
         particleCountRef.current,
@@ -117,6 +300,69 @@ export default function AetherParticles() {
     } catch {
       setIsGuideOpen(true);
     }
+  }, []);
+
+  useEffect(() => {
+    const duration = 2400;
+    const start = performance.now();
+    let frameId = 0;
+
+    const tick = (timestamp) => {
+      const elapsed = Math.min(timestamp - start, duration);
+      const nextProgress = Math.round((elapsed / duration) * 100);
+      setPreloaderProgress(nextProgress);
+
+      if (elapsed >= duration) {
+        setIsPreloaderVisible(false);
+        return;
+      }
+
+      frameId = window.requestAnimationFrame(tick);
+    };
+
+    frameId = window.requestAnimationFrame(tick);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, []);
+
+  useEffect(() => {
+    let exampleIndex = 0;
+    let characterIndex = 0;
+    let deleting = false;
+    let timeoutId;
+
+    const tick = () => {
+      const example = CUSTOM_PLACEHOLDER_EXAMPLES[exampleIndex];
+
+      if (!deleting) {
+        characterIndex += 1;
+        setCustomPlaceholder(`e.g. ${example.slice(0, characterIndex)}`);
+
+        if (characterIndex === example.length) {
+          deleting = true;
+          timeoutId = window.setTimeout(tick, 1200);
+          return;
+        }
+      } else {
+        characterIndex -= 1;
+        setCustomPlaceholder(`e.g. ${example.slice(0, characterIndex)}`);
+
+        if (characterIndex === 0) {
+          deleting = false;
+          exampleIndex = (exampleIndex + 1) % CUSTOM_PLACEHOLDER_EXAMPLES.length;
+        }
+      }
+
+      timeoutId = window.setTimeout(tick, deleting ? 50 : 90);
+    };
+
+    timeoutId = window.setTimeout(tick, 500);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
   }, []);
 
   useEffect(() => {
@@ -208,11 +454,17 @@ export default function AetherParticles() {
     const particles = new THREE.Points(geometry, material);
     scene.add(particles);
 
-    const initialPresetData = buildPresetData(
-      activePresetRef.current,
-      particleCount,
-      PRESETS[activePresetRef.current].color,
-    );
+    const initialPresetData =
+      activePresetRef.current === "custom" && customManifestRef.current
+        ? {
+            positions: customManifestRef.current.positions,
+            colors: createSolidColors(particleCount, customManifestRef.current.color),
+          }
+        : buildPresetData(
+            activePresetRef.current,
+            particleCount,
+            PRESETS[activePresetRef.current].color,
+          );
     targetPositionsRef.current = initialPresetData.positions;
     targetColorsRef.current = initialPresetData.colors;
 
@@ -354,7 +606,10 @@ export default function AetherParticles() {
       positionAttribute.needsUpdate = true;
       colorAttribute.needsUpdate = true;
       // Silhouettes stay readable from the front, horizontal models orbit sideways, volumetric objects spin freely.
-      const rotationMode = PRESETS[activePresetRef.current].rotation;
+      const rotationMode =
+        activePresetRef.current === "custom"
+          ? customManifestRef.current?.rotation ?? "drift"
+          : PRESETS[activePresetRef.current].rotation;
       const time = performance.now() * 0.001;
 
       if (rotationMode === "full") {
@@ -520,9 +775,72 @@ export default function AetherParticles() {
     };
   }, []);
 
+  const applyCustomPreset = (shapeQuery, pushUrl = true, preserveInput = true) => {
+    const shapeDefinition = resolveCustomShape(shapeQuery);
+
+    if (!shapeDefinition) {
+      setCustomHint(
+        "Shape not recognized yet. Try circle, octagon, hexagon, triangle, star, or spiral.",
+      );
+      return false;
+    }
+
+    const particleCount = particleCountRef.current || (window.innerWidth < 768 ? 7000 : 15000);
+    const nextManifest = {
+      ...shapeDefinition,
+      query: shapeQuery,
+      positions: createCustomShapePositions(shapeDefinition, particleCount),
+    };
+
+    customManifestRef.current = nextManifest;
+    activePresetRef.current = "custom";
+    setPreset("custom");
+    setParticleColor(nextManifest.color);
+    setCustomPrompt(preserveInput ? shapeQuery : "");
+    setCustomHint(`Generated: ${shapeDefinition.label}`);
+
+    if (particleCountRef.current > 0) {
+      targetPositionsRef.current = nextManifest.positions;
+      targetColorsRef.current = createSolidColors(particleCountRef.current, nextManifest.color);
+    }
+
+    colorTargetRef.current.set(nextManifest.color);
+
+    if (pushUrl) {
+      const nextUrl = new URL(window.location.href);
+      nextUrl.searchParams.set("preset", "custom");
+      nextUrl.searchParams.set("shape", nextManifest.slug);
+      window.history.replaceState({}, "", nextUrl);
+    }
+
+    return true;
+  };
+
   const handlePresetChange = (nextPreset) => {
+    customManifestRef.current = null;
     setPreset(nextPreset);
     setParticleColor(PRESETS[nextPreset].color);
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set("preset", nextPreset);
+    nextUrl.searchParams.delete("shape");
+    window.history.replaceState({}, "", nextUrl);
+  };
+
+  const handleCustomPresetSubmit = (event) => {
+    event.preventDefault();
+    applyCustomPreset(customPrompt);
+  };
+
+  const handleLogoReset = (event) => {
+    event.preventDefault();
+    customManifestRef.current = null;
+    setPreset(DEFAULT_PRESET);
+    setParticleColor(PRESETS[DEFAULT_PRESET].color);
+    setCustomPrompt("");
+    setCustomHint(DEFAULT_CUSTOM_HINT);
+    activePresetRef.current = DEFAULT_PRESET;
+    colorTargetRef.current.set(PRESETS[DEFAULT_PRESET].color);
+    window.history.replaceState({}, "", window.location.pathname);
   };
 
   const forcePercent = Math.round(forceLevel * 100);
@@ -540,10 +858,32 @@ export default function AetherParticles() {
     <main className={styles.page}>
       <canvas ref={canvasRef} className={styles.canvas} />
 
+      <div
+        className={`${styles.preloader} ${
+          isPreloaderVisible ? styles.preloaderVisible : styles.preloaderHidden
+        }`}
+        aria-hidden={!isPreloaderVisible}
+      >
+        <div className={styles.preloaderCard}>
+          <AetherLogo className={styles.preloaderLogo} />
+          <p className={styles.preloaderTitle}>aether</p>
+          <p className={styles.preloaderText}>Shaping particles in real time</p>
+          <div className={styles.preloaderMeter} aria-live="polite">
+            <span className={styles.preloaderSlash}>/</span>
+            <span className={styles.preloaderProgress}>{preloaderProgress}</span>
+          </div>
+        </div>
+      </div>
+
       <section ref={panelRef} className={styles.panel}>
         <div className={styles.panelHeader}>
           <div className={styles.brand}>
-            <a href="/" className={styles.logoLink} aria-label="Go to homepage">
+            <a
+              href="/"
+              className={styles.logoLink}
+              aria-label="Go to homepage"
+              onClick={handleLogoReset}
+            >
               <AetherLogo className={styles.logo} />
             </a>
             <div>
@@ -590,6 +930,27 @@ export default function AetherParticles() {
                 </div>
               ))}
             </div>
+          </div>
+
+          <div className={styles.block}>
+            <span className={styles.label}>Custom Preset</span>
+            <form className={styles.searchPanel} onSubmit={handleCustomPresetSubmit}>
+              <div className={styles.searchRow}>
+                <input
+                  type="search"
+                  value={customPrompt}
+                  onChange={(event) => setCustomPrompt(event.target.value)}
+                  className={styles.searchInput}
+                  placeholder={customPlaceholder}
+                  aria-label="Create a custom particle shape"
+                />
+                <button type="submit" className={styles.searchButton} aria-label="Generate preset">
+                  <span className={styles.searchButtonIcon} aria-hidden="true">
+                    ✨
+                  </span>
+                </button>
+              </div>
+            </form>
           </div>
 
           <div className={styles.block}>
@@ -805,6 +1166,186 @@ function buildPresetPositions(type, particleCount) {
     default:
       return createSpherePositions(particleCount);
   }
+}
+
+function createCustomShapePositions(shapeDefinition, particleCount) {
+  switch (shapeDefinition.type) {
+    case "circle":
+      return createCircleShapePositions(shapeDefinition, particleCount);
+    case "polygon":
+      return createRegularPolygonPositions(shapeDefinition, particleCount);
+    case "star":
+      return createStarShapePositions(shapeDefinition, particleCount);
+    case "spiral":
+      return createSpiralShapePositions(shapeDefinition, particleCount);
+    default:
+      return createSpherePositions(particleCount);
+  }
+}
+
+function createCircleShapePositions(shapeDefinition, particleCount) {
+  const targetPositions = new Float32Array(particleCount * 3);
+  const { radius, depth = 0.2, fillRatio = 0.24 } = shapeDefinition;
+
+  for (let index = 0; index < particleCount; index += 1) {
+    const offset = index * 3;
+    const angle = Math.random() * Math.PI * 2;
+
+    if (Math.random() < fillRatio) {
+      const radialDistance = Math.sqrt(Math.random()) * radius;
+      targetPositions[offset] = Math.cos(angle) * radialDistance;
+      targetPositions[offset + 1] = Math.sin(angle) * radialDistance;
+    } else {
+      const contourRadius = radius + (Math.random() - 0.5) * 0.08;
+      targetPositions[offset] = Math.cos(angle) * contourRadius;
+      targetPositions[offset + 1] = Math.sin(angle) * contourRadius;
+    }
+
+    targetPositions[offset + 2] = (Math.random() - 0.5) * depth;
+  }
+
+  return targetPositions;
+}
+
+function createRegularPolygonPositions(shapeDefinition, particleCount) {
+  const targetPositions = new Float32Array(particleCount * 3);
+  const {
+    sides,
+    radius,
+    depth = 0.2,
+    fillRatio = 0.2,
+    rotationOffset = -Math.PI / 2,
+  } = shapeDefinition;
+  const vertices = Array.from({ length: sides }, (_, index) => {
+    const angle = rotationOffset + (index / sides) * Math.PI * 2;
+    return {
+      x: Math.cos(angle) * radius,
+      y: Math.sin(angle) * radius,
+    };
+  });
+
+  for (let index = 0; index < particleCount; index += 1) {
+    const offset = index * 3;
+    const onFill = Math.random() < fillRatio;
+
+    if (onFill) {
+      const [x, y] = samplePolygonInterior(vertices);
+      targetPositions[offset] = x;
+      targetPositions[offset + 1] = y;
+    } else {
+      const edgeIndex = Math.floor(Math.random() * sides);
+      const start = vertices[edgeIndex];
+      const end = vertices[(edgeIndex + 1) % sides];
+      const progress = Math.random();
+      const contourTightness = lerp(0.985, 1.015, Math.random());
+      targetPositions[offset] =
+        lerp(start.x, end.x, progress) * contourTightness + (Math.random() - 0.5) * 0.06;
+      targetPositions[offset + 1] =
+        lerp(start.y, end.y, progress) * contourTightness + (Math.random() - 0.5) * 0.06;
+    }
+
+    targetPositions[offset + 2] = (Math.random() - 0.5) * depth;
+  }
+
+  return targetPositions;
+}
+
+function createStarShapePositions(shapeDefinition, particleCount) {
+  const targetPositions = new Float32Array(particleCount * 3);
+  const {
+    points,
+    outerRadius,
+    innerRadius,
+    depth = 0.2,
+    fillRatio = 0.18,
+  } = shapeDefinition;
+  const vertexCount = points * 2;
+  const vertices = Array.from({ length: vertexCount }, (_, index) => {
+    const angle = -Math.PI / 2 + (index / vertexCount) * Math.PI * 2;
+    const radius = index % 2 === 0 ? outerRadius : innerRadius;
+    return {
+      x: Math.cos(angle) * radius,
+      y: Math.sin(angle) * radius,
+    };
+  });
+
+  for (let index = 0; index < particleCount; index += 1) {
+    const offset = index * 3;
+    const onFill = Math.random() < fillRatio;
+
+    if (onFill) {
+      const [x, y] = samplePolygonInterior(vertices);
+      targetPositions[offset] = x;
+      targetPositions[offset + 1] = y;
+    } else {
+      const edgeIndex = Math.floor(Math.random() * vertexCount);
+      const start = vertices[edgeIndex];
+      const end = vertices[(edgeIndex + 1) % vertexCount];
+      const progress = Math.random();
+      targetPositions[offset] = lerp(start.x, end.x, progress) + (Math.random() - 0.5) * 0.05;
+      targetPositions[offset + 1] =
+        lerp(start.y, end.y, progress) + (Math.random() - 0.5) * 0.05;
+    }
+
+    targetPositions[offset + 2] = (Math.random() - 0.5) * depth;
+  }
+
+  return targetPositions;
+}
+
+function createSpiralShapePositions(shapeDefinition, particleCount) {
+  const targetPositions = new Float32Array(particleCount * 3);
+  const { turns, radius, depth = 0.22 } = shapeDefinition;
+
+  for (let index = 0; index < particleCount; index += 1) {
+    const offset = index * 3;
+    const progress = Math.random();
+    const angle = progress * Math.PI * 2 * turns;
+    const radialDistance = lerp(0.3, radius, progress);
+    const width = lerp(0.38, 0.06, progress);
+    const outward = (Math.random() - 0.5) * width;
+    const x = Math.cos(angle) * (radialDistance + outward);
+    const y = Math.sin(angle) * (radialDistance + outward);
+
+    targetPositions[offset] = x;
+    targetPositions[offset + 1] = y;
+    targetPositions[offset + 2] = (Math.random() - 0.5) * depth;
+  }
+
+  return targetPositions;
+}
+
+function samplePolygonInterior(vertices) {
+  const triangles = [];
+  let totalArea = 0;
+
+  for (let index = 1; index < vertices.length - 1; index += 1) {
+    const triangle = [vertices[0], vertices[index], vertices[index + 1]];
+    const area = triangleArea(triangle[0], triangle[1], triangle[2]);
+    totalArea += area;
+    triangles.push({ triangle, totalArea });
+  }
+
+  const pick = Math.random() * totalArea;
+  const match =
+    triangles.find((entry) => pick <= entry.totalArea) ?? triangles[triangles.length - 1];
+  const [a, b, c] = match.triangle;
+  let u = Math.random();
+  let v = Math.random();
+
+  if (u + v > 1) {
+    u = 1 - u;
+    v = 1 - v;
+  }
+
+  return [
+    a.x + u * (b.x - a.x) + v * (c.x - a.x),
+    a.y + u * (b.y - a.y) + v * (c.y - a.y),
+  ];
+}
+
+function triangleArea(a, b, c) {
+  return Math.abs((a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y)) / 2);
 }
 
 function createSpherePositions(particleCount) {
