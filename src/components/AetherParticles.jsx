@@ -20,7 +20,7 @@ const PRESETS = {
   lotus: { label: "Lotus", color: "#ec4899", icon: "\u{1FAB7}", rotation: "lotusUpperFull" },
   fireworks: { label: "Fireworks", color: "#b91c1c", icon: "\u2726", rotation: "full" },
   supernova: { label: "Supernova", color: "#8b5cf6", icon: "\u273A", rotation: "galaxyTilt" },
-  cube: { label: "Cube", color: "#14b8a6", icon: "\u25A3", rotation: "full" },
+  cube: { label: "Cube", color: "#14b8a6", icon: "\u25A3", rotation: "cubeFull" },
   square: { label: "Square", color: "#d97706", icon: "\u25A0", rotation: "heartDrift" },
 };
 
@@ -582,6 +582,10 @@ export default function AetherParticles() {
       const time = performance.now() * 0.001;
 
       if (rotationMode === "sphereFull") {
+        particles.rotation.y += 0.0022;
+        particles.rotation.x += 0.0011;
+        particles.rotation.z += (0 - particles.rotation.z) * 0.08;
+      } else if (rotationMode === "cubeFull") {
         particles.rotation.y += 0.0022;
         particles.rotation.x += 0.0011;
         particles.rotation.z += (0 - particles.rotation.z) * 0.08;
@@ -1661,7 +1665,7 @@ function createSupernovaData(particleCount) {
 
 function createCubePositions(particleCount) {
   const targetPositions = new Float32Array(particleCount * 3);
-  const halfSize = 4.2;
+  const halfSize = 4.725;
 
   for (let index = 0; index < particleCount; index += 1) {
     const offset = index * 3;
