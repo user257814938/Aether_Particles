@@ -5,6 +5,10 @@
 Interactive 3D particle sculpture built with Next.js, Three.js, and MediaPipe.  
 The experience combines hand tracking, animated particle presets, custom shape generation, a custom sidebar UI, and a realtime gesture meter.
 
+# Workflow 
+
+![workflow](public/workflow.png)
+
 ## Overview
 
 `aether` is a browser-based visual sculpture system:
